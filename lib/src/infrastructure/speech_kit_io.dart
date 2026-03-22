@@ -297,11 +297,11 @@ Future<AssetInventoryStatus> assetInventoryStatusImpl(
         completer.completeError(e, st);
       }
     } finally {
+      malloc.free(jsonPtr);
       callback.close();
     }
   });
   _skAssetInventoryStatusAsync(jsonPtr, callback.nativeFunction);
-  malloc.free(jsonPtr);
   return completer.future;
 }
 
@@ -340,10 +340,10 @@ Future<void> ensureAssetsInstalledImpl(
         completer.completeError(e, st);
       }
     } finally {
+      malloc.free(jsonPtr);
       callback.close();
     }
   });
   _skAssetEnsureInstalledAsync(jsonPtr, callback.nativeFunction);
-  malloc.free(jsonPtr);
   return completer.future;
 }
