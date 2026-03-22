@@ -1,0 +1,29 @@
+name: speech_kit
+description: >-
+  Dart bindings for Apple's Speech framework using the SpeechAnalyzer,
+  SpeechTranscriber, and AssetInventory pipeline.
+version: 0.0.1
+repository: https://github.com/blendfactory/speech-kit
+documentation: https://github.com/blendfactory/speech-kit#readme
+issue_tracker: https://github.com/blendfactory/speech-kit/issues
+
+environment:
+  sdk: ^3.10.0
+
+platforms:
+  ios:
+  macos:
+
+topics:
+  - speech
+  - speech-recognition
+  - ios
+  - macos
+  - apple
+
+dependencies:
+  meta: ^1.16.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6
