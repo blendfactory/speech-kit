@@ -1,7 +1,10 @@
 # speech_kit example
 
 Sample command-line app demonstrating speech recognition and microphone
-permission queries with `speech_kit`.
+permission queries with `speech_kit`. If speech recognition status is
+`notDetermined`, the sample calls `SpeechKit.requestSpeechRecognitionPermission()`.
+If the microphone is `undetermined`, it calls `SpeechKit.requestMicrophonePermission()`.
+Either flow may only work fully in a signed app with the right usage strings.
 
 ## Requirements
 
