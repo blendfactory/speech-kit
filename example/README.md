@@ -66,11 +66,29 @@ dart run bin/permission_status.dart
 
 On non-macOS hosts the tool exits with code `2` and prints a short message.
 
+### Asset inventory (SpeechTranscriber models)
+
+`bin/asset_inventory.dart` calls `SpeechKit.assetInventoryStatus` for one
+`SpeechTranscriberConfiguration` (default locale `en-US`). With `--install`, it
+also runs `ensureAssetsInstalled`, which may **download on-device assets**
+(network / time).
+
+**Requires macOS 26+** (same as the parent package’s Swift `AssetInventory`).
+
+```bash
+dart pub get
+dart run bin/asset_inventory.dart
+dart run bin/asset_inventory.dart --locale ja-JP
+dart run bin/asset_inventory.dart --locale en-US --install
+```
+
 ## Layout
 
 | Path | Role |
 |------|------|
 | `bin/permission_status.dart` | CLI entry |
 | `lib/permission_status_sample.dart` | Shared sample logic |
+| `bin/asset_inventory.dart` | CLI entry for AssetInventory |
+| `lib/asset_inventory_sample.dart` | Asset status / optional install sample |
 | `macos_bundle/Info.plist` | Template plist for the bundled AOT demo |
 | `scripts/build_macos_permission_app.sh` | Builds `build/PermissionStatusDemo.app` |
