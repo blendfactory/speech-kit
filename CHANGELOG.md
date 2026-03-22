@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Align static analysis with `screen-capture-kit` (`all_lint_rules.yaml` + shared `analysis_options.yaml` pattern; drop `package:lints`).
+
 ## [0.0.1] - 2026-03-22
 
 ### Added

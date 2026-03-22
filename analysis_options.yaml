@@ -1,30 +1,115 @@
-# This file configures the static analysis results for your project (errors,
-# warnings, and lints).
-#
-# This enables the 'recommended' set of lints from `package:lints`.
-# This set helps identify many issues that may lead to problems when running
-# or consuming Dart code, and enforces writing Dart using a single, idiomatic
-# style and format.
-#
-# If you want a smaller set of lints you can change this to specify
-# 'package:lints/core.yaml'. These are just the most critical lints
-# (the recommended set includes the core lints).
-# The core lints are also what is used by pub.dev for scoring packages.
+include: all_lint_rules.yaml
 
-include: package:lints/recommended.yaml
+analyzer:
+  language:
+    # Increase safety as much as possible.
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # By including all.yaml, some rules will conflict. These warnings will be addressed within this file.
+    included_file_warning: ignore
 
-# Uncomment the following section to specify additional rules.
+    # Members annotated with `visibleForTesting` should not be referenced outside of the library in which they are declared or libraries within the test directory.
+    invalid_use_of_visible_for_testing_member: error
 
-# linter:
-#   rules:
-#     - camel_case_types
+    # Superclass members should not be unintentionally overridden, as this reduces readability.
+    annotate_overrides: error
 
-# analyzer:
-#   exclude:
-#     - path/to/excluded/files/**
+    # Class members should not be unintentionally redeclared, as this reduces readability.
+    annotate_redeclares: error
 
-# For more information about the core and recommended set of lints, see
-# https://dart.dev/go/core-lints
+    # When using implements, you do not inherit the method body of `==`, making it nearly impossible to follow the contract of `==`.
+    avoid_implementing_value_types: error
 
-# For additional information about configuring this file, see
-# https://dart.dev/guides/language/analysis-options
+    # Parameter names in overridden methods that do not match the original method's parameter names are usually considered typos.
+    avoid_renaming_method_parameters: error
+
+    # Shadowing type parameters should not be used, as this reduces readability.
+    avoid_shadowing_type_parameters: error
+
+    # Should not reference files that do not exist for conditional imports, as this will result in possible runtime failures.
+    conditional_uri_does_not_exist: error
+
+    # When importing a package, add it as a dependency in pubspec to impose constraints on the dependency, protecting against breaking changes.
+    depend_on_referenced_packages: error
+
+    # Some file systems are not case-sensitive, so many projects require filenames to be all lowercase.
+    file_names: error
+
+    # Files in the package's lib/src directory are not public APIs and should not be imported.
+    implementation_imports: error
+
+    # Library directive names should follow conventions (e.g. lowercase_with_underscores) for consistency.
+    library_names: error
+
+    # Super parameter names that do not match the parameter name of the corresponding super constructor are usually considered typos.
+    matching_super_parameters: error
+
+    # When unwrapping to a generic type parameter T, using `x!` can lead to a runtime error if T is given a nullable type, so you should use `x as T` instead.
+    null_check_on_nullable_type_parameter: error
+
+    # If package names are not determined according to the rules, unexpected problems may occur.
+    package_names: error
+
+    # Recursive getters are usually considered typos.
+    recursive_getters: error
+
+    # Should not be assigned to `void`.
+    void_checks: error
+
+formatter:
+  trailing_commas: preserve
+
+linter:
+  rules:
+    # Flutter-specific rules (this package is Dart-only)
+    avoid_unnecessary_containers: false
+    avoid_web_libraries_in_flutter: false
+    diagnostic_describe_all_properties: false
+    flutter_style_todos: false
+    no_logic_in_create_state: false
+    sized_box_for_whitespace: false
+    sized_box_shrink_expand: false
+    sort_child_properties_last: false
+    use_build_context_synchronously: false
+    use_colored_box: false
+    use_decorated_box: false
+    use_full_hex_values_for_flutter_colors: false
+    use_key_in_widget_constructors: false
+
+    # Conflicts with enabling `avoid_types_on_closure_parameters`, `omit_local_variable_types`, `omit_obvious_local_variable_types`, `omit_obvious_property_types`.
+    always_specify_types: false
+
+    # Conflicts with enabling `strict-raw-types`.
+    avoid_annotating_with_dynamic: false
+
+    # There are cases that are warned but not fixed by `dart fix`.
+    cascade_invocations: false
+
+    # May add more methods later.
+    one_member_abstracts: false
+
+    # Conflicts with enabling `prefer_single_quotes`.
+    prefer_double_quotes: false
+
+    # Using `=>` sometimes reduces readability.
+    prefer_expression_function_bodies: false
+
+    # Conflicts with enabling `avoid_final_parameters`.
+    prefer_final_parameters: false
+
+    # Conflicts with enabling `always_use_package_imports`.
+    prefer_relative_imports: false
+
+    # Don't often develop package.
+    public_member_api_docs: false
+
+    # Conflicts with enabling `omit_local_variable_types`.
+    specify_nonobvious_local_variable_types: false
+
+    # Conflicts with enabling `prefer_final_locals`.
+    unnecessary_final: false
+
+    # Don't trigger warnings with methods for simple state updates, among other things.
+    use_setters_to_change_properties: false

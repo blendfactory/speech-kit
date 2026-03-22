@@ -78,15 +78,7 @@ Ref: [`dart doc`](https://dart.dev/tools/dart-doc) and [documentation comments](
 
 ## Lint Rules
 
-Use `package:dart_lints` in `analysis_options.yaml`:
-
-```yaml
-include: package:dart_lints/dart.yaml
-
-linter:
-  rules:
-    # Add project-specific rules
-```
+Match `screen-capture-kit`: `analysis_options.yaml` includes `all_lint_rules.yaml` (full rule list from the Dart linter docs) and overrides conflicting rules in `analysis_options.yaml`, same as the Blendfactory sibling package.
 
 ## Testing
 
