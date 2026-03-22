@@ -1,0 +1,188 @@
+---
+description: DDD and layered architecture for speech_kit; dependency rules and SpeechAnalyzer pipeline boundaries
+globs: lib/**/*.dart
+alwaysApply: false
+---
+
+# Architecture: DDD + Layered
+
+This project follows **Domain-Driven Design (DDD)** and a **layered architecture**, mirroring **screen-capture-kit**. Dependencies flow inward: outer layers depend on inner layers; the **domain** has no dependencies on other layers.
+
+Apple integration uses only the **module-based** Speech API: **`SpeechAnalyzer`**, **`SpeechTranscriber`** (and related **`SpeechModule`** types), and **`AssetInventory`**. Do not model or bind the legacy **`SFSpeechRecognizer`** pipeline in domain or application layers. See `.cursor/skills/speech-kit-spec`.
+
+## Layer overview
+
+| Layer | Responsibility | Allowed to depend on |
+|-------|----------------|----------------------|
+| **Presentation / API** | Public exports, facade, barrel files | Application, Domain |
+| **Application** | Use cases, orchestration, application services | Domain, (optional) infrastructure interfaces |
+| **Domain** | Entities, value objects, domain types, domain errors | Nothing (pure Dart, no platform/io) |
+| **Infrastructure** | Platform impl (Swift bridge, FFI, hooks), adapters | Domain, Application (implements app ports) |
+
+**Note**: “Presentation” means *presented to the consumer* (public API and configuration types), not a UI layer. The library exposes a single barrel and a facade (e.g. `SpeechKit`).
+
+**Intended use cases**: This package is a **speech-analysis / transcription building block**—live captions, dictation-style input, piping audio into **on-device** transcription for downstream tools (summarization, translation, meeting notes) implemented **outside** this package. It does **not** own translation, summarization, or arbitrary media encoding.
+
+## Consumer guidance (apps & CLI)
+
+- **Entry point**: Prefer one import `package:speech_kit/speech_kit.dart` and a facade such as **`SpeechKit`**, suitable for Flutter apps, CLI tools, and other Dart libraries.
+- **Typical flow** (target, aligned with Apple docs): ensure **assets** for chosen modules (`AssetInventory`) → create **module configuration** (e.g. `SpeechTranscriber` locale/preset) → open **`SpeechAnalysisSession`** / start **`SpeechAnalyzer`** → feed **`AnalyzerInput`** (buffers or file) → consume **result streams** → **finalize or cancel** explicitly when done. Use `try/finally` or `async` cleanup so native sessions always end.
+- **DI and testing**: Inject `SpeechKit` (or a port interface if introduced); substitute fakes or `implements` for tests.
+- **Platform and errors**: On unsupported OS versions, throw **`UnsupportedError`**. Map permission, asset, and analyzer failures to **`SpeechKitException`** (or equivalent domain error).
+
+## Dependency rule (Mermaid)
+
+```mermaid
+flowchart TB
+  subgraph Outer["Outer layers"]
+    P["Presentation / API\n(public API, exports)"]
+    A["Application\n(use cases, SpeechKit)"]
+  end
+  subgraph Inner["Inner layers"]
+    D["Domain\n(session, configs, results VOs)"]
+    I["Infrastructure\n(Swift/FFI, stubs)"]
+  end
+
+  P --> A
+  P --> D
+  A --> D
+  I --> D
+  I -.->|implements| A
+
+  style D fill:#e8f5e9
+  style A fill:#e3f2fd
+  style I fill:#fff3e0
+  style P fill:#f3e5f5
+```
+
+**Rule**: Domain is innermost; domain code must not import application, infrastructure, or presentation.
+
+## Layer dependency diagram (simplified)
+
+```mermaid
+flowchart LR
+  subgraph layers
+    direction TB
+    L4["4. Presentation"]
+    L3["3. Application"]
+    L2["2. Domain"]
+    L1["1. Infrastructure"]
+  end
+  L4 --> L3
+  L3 --> L2
+  L1 --> L2
+  L3 -.->|uses via ports| L1
+```
+
+## Target package layout (`lib/`)
+
+```mermaid
+flowchart TB
+  subgraph lib["lib/"]
+    barrel["speech_kit.dart\n(barrel, exports)"]
+    subgraph src["src/"]
+      subgraph domain["domain/"]
+        d_values["value_objects: session id, config, transcription updates, time ranges"]
+        d_errors["errors/speech_kit_exception"]
+      end
+      subgraph application["application/"]
+        app_service["speech_kit.dart\n(application service / facade impl)"]
+        app_ports["ports/\n(optional)"]
+      end
+      subgraph infrastructure["infrastructure/"]
+        impl_apple["speech_kit_apple.dart\n(SpeechAnalyzer bridge)"]
+        impl_stub["speech_kit_stub.dart"]
+      end
+      subgraph presentation["presentation/"]
+        api_types["public config / stream types as needed"]
+      end
+    end
+  end
+  barrel --> app_service
+  barrel --> domain
+  app_service --> domain
+  app_service --> app_ports
+  impl_apple --> domain
+  impl_apple --> app_ports
+  impl_stub --> domain
+  presentation --> domain
+```
+
+Suggested directory structure:
+
+```
+lib/
+  speech_kit.dart                 # Barrel: export public API only
+  src/
+    domain/
+      entities/                   # Optional; add only if identity-bound concepts appear
+      value_objects/
+        identifiers/
+        configuration/
+        results/
+      errors/
+        speech_kit_exception.dart
+    application/
+      speech_kit.dart             # Main facade / application service
+      ports/                      # Optional: e.g. analyzer_port, asset_inventory_port
+    infrastructure/
+      speech_kit_apple.dart       # macOS / iOS implementation
+      speech_kit_stub.dart        # Unsupported platforms
+    presentation/                 # Types presented to consumers (non-UI)
+```
+
+Exact file names will evolve with the first implementation; keep **dependency direction** as above.
+
+## Domain model (aggregate, entities, value objects)
+
+The full model is documented in [doc/domain-model.md](../../doc/domain-model.md). Summary:
+
+- **Aggregate root**: **`SpeechAnalysisSession`** — one **`SpeechAnalyzer`**-backed session; single input-sequence semantics per Apple; explicit finalize/cancel lifecycle.
+- **Entities**: **None required initially**; prefer value objects + session root until a stable concept needs identity (e.g. long-lived reserved locales).
+- **Value objects**: **Extension types** for opaque handles (e.g. **`SpeechAnalysisSessionId`**); **immutable classes** for **transcriber configuration**, **asset status**, **transcription updates** / timing metadata streamed to callers.
+
+## Domain context (DDD)
+
+```mermaid
+flowchart LR
+  subgraph BoundedContext["Speech analysis (SpeechAnalyzer)"]
+    subgraph Aggregate["Aggregate root"]
+      SAS["SpeechAnalysisSession"]
+    end
+    subgraph VOs["Value objects"]
+      SID["SpeechAnalysisSessionId"]
+      CFG["TranscriberConfiguration, AssetInventoryStatus"]
+      RES["TranscriptionUpdate, time ranges"]
+    end
+  end
+  SAS --> SID
+  SAS --> CFG
+  SAS -.->|stream| RES
+```
+
+## Conventions
+
+1. **Domain**: No `dart:io`, `dart:ffi`, no platform-specific imports. Pure Dart types and exceptions.
+2. **Value objects**: **Extension types** for scalar handles; **immutable classes** for multi-field configuration and streamed results. See [doc/domain-model.md](../../doc/domain-model.md).
+3. **Application**: Holds **`SpeechKit`** (or equivalent) and orchestrates **asset check → session → streams → teardown**. Calls infrastructure via ports when interfaces exist.
+4. **Infrastructure**: All **Swift / FFI / conditional imports** live here. Maps **`SpeechTranscriber.results`** (and siblings) into Dart **`Stream`** / **`Future`** types using domain value objects at the boundary.
+5. **Presentation**: Public configuration and re-exports; **no business logic**.
+6. **Imports**: Inner layers never import outer layers. Use **dependency inversion** (ports in application/domain, implementations in infrastructure).
+7. **Legacy API**: **`SFSpeechRecognizer`** and related types must **not** appear in **domain** or **application** public models. If a one-off native **authorization** symbol is required, hide it inside infrastructure and surface **neutral Dart types** only.
+
+## Refactoring checklist
+
+When shaping code toward this architecture:
+
+- [ ] Assign each file to **domain / application / infrastructure / presentation**.
+- [ ] Move code into the folders above; fix imports to respect the dependency rule.
+- [ ] Ensure **domain** has **zero** dependencies on other layers.
+- [ ] Introduce **ports** in application when testing or multiple backends need a seam.
+- [ ] Keep **`speech_kit.dart`** exporting only the intended public surface.
+- [ ] Document **session lifecycle** in API docs and README: sessions must be **finalized or cancelled**; recommend `try/finally` / `async` cleanup.
+- [ ] Map Apple **`SpeechAnalyzer`** finish semantics accurately; document that **ending the input `AsyncStream` alone** does not always end the session (per Apple).
+- [ ] Update [doc/domain-model.md](../../doc/domain-model.md) when native handle shapes and result types are fixed.
+
+## Design review
+
+Layering matches **screen-capture-kit** while centering the bounded context on **SpeechAnalyzer + modules + AssetInventory**. The aggregate **`SpeechAnalysisSession`** encodes Apple’s **one input sequence at a time** rule. Streamed transcription chunks remain **value objects** outside aggregate state, analogous to **`CapturedFrame`** relative to **`ShareableContent`**.

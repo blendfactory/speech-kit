@@ -34,6 +34,8 @@ dart run example/speech_kit_example.dart
 ## Architecture and Apple API coverage
 
 - Follow `.cursor/rules/dart-standards.mdc` for Dart code.
+- Follow `.cursor/rules/architecture-ddd-layered.mdc` for layer boundaries (DDD + layered layout aligned with `screen-capture-kit`).
+- See `doc/domain-model.md` for the bounded context, aggregate (**`SpeechAnalysisSession`**), and value object conventions.
 - Use `.cursor/skills/speech-kit-spec` and `.cursor/skills/speech-kit-api-coverage` when mapping Apple’s Speech APIs to Dart.
 - Use `.cursor/skills/speech-kit-native-bridge` when implementing or extending the native layer.
 - **Do not** add the legacy **`SFSpeechRecognizer`** pipeline; stick to **`SpeechAnalyzer` / `SpeechTranscriber` / `AssetInventory`** (see `speech-kit-spec`).

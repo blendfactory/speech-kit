@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Architecture rule `.cursor/rules/architecture-ddd-layered.mdc` and `doc/domain-model.md` (DDD + layered design for the SpeechAnalyzer pipeline).
+
 ### Changed
 
 - Align static analysis with `screen-capture-kit` (`all_lint_rules.yaml` + shared `analysis_options.yaml` pattern; drop `package:lints`).
