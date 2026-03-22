@@ -32,20 +32,20 @@ Update rows as implementation progresses.
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| Speech + microphone consent (`Info.plist` usage strings + runtime authorization per Apple docs) | ❌ | If the only runtime entry point is a legacy class method (e.g. `+[SFSpeechRecognizer requestAuthorization:]`), call it **inside native glue** only; **do not** expose `SFSpeechRecognizer` (or task/request types) in the **Dart public API** |
+| Speech + microphone consent (`Info.plist` usage strings + runtime authorization per Apple docs) | 🚧 | **macOS:** native dylib calls `+[SFSpeechRecognizer requestAuthorization:]` + `AVAudioApplication` record permission; Dart exposes `SpeechRecognitionPermission` / `MicrophonePermission` only. **iOS:** hook builds macOS asset only—add iOS build + embedder testing. Callers must still ship `NSSpeechRecognitionUsageDescription` / microphone usage strings. |
 
 ### Asset inventory
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| `AssetInventory.status(forModules:)` | ❌ | |
-| `AssetInventory.assetInstallationRequest(supporting:)` + install | ❌ | |
+| `AssetInventory.status(forModules:)` | 🚧 | Dart: `SpeechKit.assetInventoryStatus` + `SpeechTranscriberConfiguration`; native Swift bridge **not** wired—throws `SpeechKitFailure.notImplemented`. |
+| `AssetInventory.assetInstallationRequest(supporting:)` + install | 🚧 | Dart: `SpeechKit.ensureAssetsInstalled`; native **not** wired—throws `notImplemented`. |
 
 ### Transcription module
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| `SpeechTranscriber` (locale, presets/options) | ❌ | |
+| `SpeechTranscriber` (locale, presets/options) | 🚧 | Dart: `SpeechTranscriberConfiguration`, `SpeechTranscriberPreset`; no native module construction yet. |
 | `DictationTranscriber` (optional) | ❌ | |
 | `SpeechDetector` (optional) | ❌ | |
 
