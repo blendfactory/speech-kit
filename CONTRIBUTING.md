@@ -10,12 +10,18 @@ As the package layout is established, the following will apply:
 - **Apple platforms** — Xcode and devices or simulators for iOS/macOS when working on the native bridge or integration tests.
 - **Permissions** — Speech recognition and microphone usage require appropriate entitlements and Info.plist / usage descriptions; examples will live under `example/` when added.
 
-From the package root (once `pubspec.yaml` exists):
+From the package root:
 
 ```bash
 dart pub get
 dart analyze
 dart test
+```
+
+To run the placeholder example:
+
+```bash
+dart run example/speech_kit_example.dart
 ```
 
 ## Pull requests

@@ -35,13 +35,38 @@ The module API this package uses requires **recent Apple OS releases** (e.g. **m
 
 ## Installation
 
-When the package is published:
+From pub.dev (when published):
 
 ```bash
 dart pub add speech_kit
 ```
 
-Until then, use a path or git dependency from this repository once `pubspec.yaml` exists.
+From a local clone:
+
+```yaml
+dependencies:
+  speech_kit:
+    path: ../speech-kit
+```
+
+## Example
+
+The API is a placeholder until native bindings exist:
+
+```dart
+import 'package:speech_kit/speech_kit.dart';
+
+void main() {
+  const kit = SpeechKit();
+  // ...
+}
+```
+
+Run the sample:
+
+```bash
+dart run example/speech_kit_example.dart
+```
 
 ## Contributing
 
