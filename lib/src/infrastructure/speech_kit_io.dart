@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io' show Platform;
 
+import 'package:ffi/ffi.dart';
 import 'package:speech_kit/src/domain/errors/speech_kit_exception.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
@@ -56,6 +58,36 @@ external void _skRequestMicrophonePermission(
   Pointer<NativeFunction<Void Function(Int32)>> callback,
 );
 
+typedef SkAssetCallbackNative = Void Function(Int32, Int32, Pointer<Utf8>);
+
+@Native<
+  Void Function(
+    Pointer<Utf8>,
+    Pointer<NativeFunction<SkAssetCallbackNative>>,
+  )
+>(
+  symbol: 'sk_asset_inventory_status_async',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external void _skAssetInventoryStatusAsync(
+  Pointer<Utf8> jsonUtf8,
+  Pointer<NativeFunction<SkAssetCallbackNative>> callback,
+);
+
+@Native<
+  Void Function(
+    Pointer<Utf8>,
+    Pointer<NativeFunction<SkAssetCallbackNative>>,
+  )
+>(
+  symbol: 'sk_asset_ensure_installed_async',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external void _skAssetEnsureInstalledAsync(
+  Pointer<Utf8> jsonUtf8,
+  Pointer<NativeFunction<SkAssetCallbackNative>> callback,
+);
+
 SpeechRecognitionPermission _speechRecognitionPermissionFromCode(int code) {
   switch (code) {
     case -1:
@@ -103,6 +135,50 @@ void _ensureAppleDesktop() {
       'speech_kit native permissions are implemented for macOS only in this '
       'release. Current platform: ${Platform.operatingSystem}',
     );
+  }
+}
+
+String? _mallocUtf8ToDartAndFree(Pointer<Utf8> ptr) {
+  if (ptr == nullptr) {
+    return null;
+  }
+  try {
+    return ptr.toDartString();
+  } finally {
+    malloc.free(ptr);
+  }
+}
+
+String _encodeSpeechModulesJson(List<SpeechModuleConfiguration> modules) {
+  final list = <Map<String, Object>>[];
+  for (final m in modules) {
+    switch (m) {
+      case SpeechTranscriberConfiguration(:final localeId, :final preset):
+        list.add({
+          'kind': 'transcriber',
+          'locale': localeId,
+          'preset': preset.index,
+        });
+    }
+  }
+  return jsonEncode(list);
+}
+
+AssetInventoryStatus _assetInventoryStatusFromNativeCode(int code) {
+  switch (code) {
+    case 0:
+      return AssetInventoryStatus.unsupported;
+    case 1:
+      return AssetInventoryStatus.supported;
+    case 2:
+      return AssetInventoryStatus.downloading;
+    case 3:
+      return AssetInventoryStatus.installed;
+    default:
+      throw SpeechKitException(
+        'Unknown asset inventory status code: $code',
+        failure: SpeechKitFailure.operationFailed,
+      );
   }
 }
 
@@ -198,13 +274,35 @@ Future<AssetInventoryStatus> assetInventoryStatusImpl(
       ),
     );
   }
-  return Future.error(
-    const SpeechKitException(
-      'AssetInventory.status(forModules:) requires the Swift SpeechAnalyzer '
-      'bridge; not implemented yet.',
-      failure: SpeechKitFailure.notImplemented,
-    ),
-  );
+  final json = _encodeSpeechModulesJson(modules);
+  final jsonPtr = json.toNativeUtf8();
+  final completer = Completer<AssetInventoryStatus>();
+  late final NativeCallable<Void Function(Int32, Int32, Pointer<Utf8>)>
+  callback;
+  callback = NativeCallable.listener((int primary, int err, Pointer<Utf8> msg) {
+    try {
+      if (err != 0) {
+        final text = _mallocUtf8ToDartAndFree(msg);
+        completer.completeError(
+          SpeechKitException(
+            text ?? 'AssetInventory.status failed (error code $err)',
+            failure: SpeechKitFailure.operationFailed,
+          ),
+        );
+        return;
+      }
+      completer.complete(_assetInventoryStatusFromNativeCode(primary));
+    } on Object catch (e, st) {
+      if (!completer.isCompleted) {
+        completer.completeError(e, st);
+      }
+    } finally {
+      callback.close();
+    }
+  });
+  _skAssetInventoryStatusAsync(jsonPtr, callback.nativeFunction);
+  malloc.free(jsonPtr);
+  return completer.future;
 }
 
 Future<void> ensureAssetsInstalledImpl(
@@ -219,11 +317,33 @@ Future<void> ensureAssetsInstalledImpl(
       ),
     );
   }
-  return Future.error(
-    const SpeechKitException(
-      'AssetInventory.assetInstallationRequest(supporting:) requires the '
-      'Swift bridge; not implemented yet.',
-      failure: SpeechKitFailure.notImplemented,
-    ),
-  );
+  final json = _encodeSpeechModulesJson(modules);
+  final jsonPtr = json.toNativeUtf8();
+  final completer = Completer<void>();
+  late final NativeCallable<Void Function(Int32, Int32, Pointer<Utf8>)>
+  callback;
+  callback = NativeCallable.listener((int _, int err, Pointer<Utf8> msg) {
+    try {
+      if (err != 0) {
+        final text = _mallocUtf8ToDartAndFree(msg);
+        completer.completeError(
+          SpeechKitException(
+            text ?? 'ensureAssetsInstalled failed (error code $err)',
+            failure: SpeechKitFailure.operationFailed,
+          ),
+        );
+        return;
+      }
+      completer.complete();
+    } on Object catch (e, st) {
+      if (!completer.isCompleted) {
+        completer.completeError(e, st);
+      }
+    } finally {
+      callback.close();
+    }
+  });
+  _skAssetEnsureInstalledAsync(jsonPtr, callback.nativeFunction);
+  malloc.free(jsonPtr);
+  return completer.future;
 }

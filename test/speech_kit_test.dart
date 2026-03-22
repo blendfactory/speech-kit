@@ -22,21 +22,13 @@ void main() {
           ),
         ),
       );
-      await expectLater(
-        kit.assetInventoryStatus([
-          const SpeechTranscriberConfiguration(
-            localeId: 'en-US',
-            preset: SpeechTranscriberPreset.transcription,
-          ),
-        ]),
-        throwsA(
-          predicate(
-            (e) =>
-                e is SpeechKitException &&
-                e.failure == SpeechKitFailure.notImplemented,
-          ),
+      final status = await kit.assetInventoryStatus([
+        const SpeechTranscriberConfiguration(
+          localeId: 'en-US',
+          preset: SpeechTranscriberPreset.transcription,
         ),
-      );
+      ]);
+      expect(status, isA<AssetInventoryStatus>());
     } else {
       await expectLater(
         kit.speechRecognitionAuthorizationStatus(),

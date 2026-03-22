@@ -44,16 +44,19 @@ class SpeechKit {
 
   /// Asset readiness for the given modules (maps to `AssetInventory.status`).
   ///
-  /// Not implemented until the Swift bridge is linked.
+  /// **macOS 26+** with native dylib. Only `SpeechTranscriberConfiguration`
+  /// entries are supported in this release.
   Future<AssetInventoryStatus> assetInventoryStatus(
     List<SpeechModuleConfiguration> modules,
   ) {
     return assetInventoryStatusImpl(modules);
   }
 
-  /// Ensures assets are installed for the given modules (installation request).
+  /// Ensures assets are installed (`assetInstallationRequest` +
+  /// `downloadAndInstall` when needed).
   ///
-  /// Not implemented until the Swift bridge is linked.
+  /// **macOS 26+** with native dylib. May perform network I/O while downloading
+  /// models. Only `SpeechTranscriberConfiguration` entries are supported.
   Future<void> ensureAssetsInstalled(List<SpeechModuleConfiguration> modules) {
     return ensureAssetsInstalledImpl(modules);
   }
