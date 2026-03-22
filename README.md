@@ -51,21 +51,25 @@ dependencies:
 
 ## Example
 
-The API is a placeholder until native bindings exist:
+See the [`example/`](example/) package (same layout as other Blendfactory native
+packages: `pubspec.yaml`, `bin/`, `lib/`, README).
 
 ```dart
 import 'package:speech_kit/speech_kit.dart';
 
-void main() {
+Future<void> main() async {
   const kit = SpeechKit();
+  final status = await kit.speechRecognitionAuthorizationStatus();
   // ...
 }
 ```
 
-Run the sample:
+Run the sample from `example/`:
 
 ```bash
-dart run example/speech_kit_example.dart
+cd example
+dart pub get
+dart run bin/permission_status.dart
 ```
 
 ## Contributing

@@ -1,0 +1,10 @@
+name: speech_kit_example
+description: Example for speech_kit package.
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  speech_kit:
+    path: ../

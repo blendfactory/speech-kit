@@ -18,10 +18,12 @@ dart analyze
 dart test
 ```
 
-To run the placeholder example:
+To run the example CLI:
 
 ```bash
-dart run example/speech_kit_example.dart
+cd example
+dart pub get
+dart run bin/permission_status.dart
 ```
 
 ## Pull requests
