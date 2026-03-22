@@ -13,6 +13,10 @@ enum SpeechKitFailure {
 
   /// Underlying framework returned an error (see `message` / `cause`).
   operationFailed,
+
+  /// Required `Info.plist` usage description is missing (Apple may abort if
+  /// the native request were invoked).
+  missingPrivacyUsageDescription,
 }
 
 /// Exception thrown when `SpeechKit` API fails.

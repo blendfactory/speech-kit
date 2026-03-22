@@ -25,8 +25,16 @@ Future<int> runPermissionStatusSample() async {
 
   if (speech == SpeechRecognitionPermission.notDetermined) {
     stdout.writeln('Requesting speech recognition permission...');
-    speech = await kit.requestSpeechRecognitionPermission();
-    stdout.writeln('Speech recognition (after request): $speech');
+    try {
+      speech = await kit.requestSpeechRecognitionPermission();
+      stdout.writeln('Speech recognition (after request): $speech');
+    } on SpeechKitException catch (e) {
+      if (e.failure != SpeechKitFailure.missingPrivacyUsageDescription) {
+        rethrow;
+      }
+      stderr.writeln(e.message);
+      speech = await kit.speechRecognitionAuthorizationStatus();
+    }
   }
 
   if (speech == SpeechRecognitionPermission.denied ||
@@ -42,9 +50,17 @@ Future<int> runPermissionStatusSample() async {
 
   if (mic == MicrophonePermission.undetermined) {
     stdout.writeln('Requesting microphone permission...');
-    await kit.requestMicrophonePermission();
-    mic = await kit.microphonePermissionStatus();
-    stdout.writeln('Microphone (after request): $mic');
+    try {
+      await kit.requestMicrophonePermission();
+      mic = await kit.microphonePermissionStatus();
+      stdout.writeln('Microphone (after request): $mic');
+    } on SpeechKitException catch (e) {
+      if (e.failure != SpeechKitFailure.missingPrivacyUsageDescription) {
+        rethrow;
+      }
+      stderr.writeln(e.message);
+      mic = await kit.microphonePermissionStatus();
+    }
   }
 
   if (mic == MicrophonePermission.denied) {

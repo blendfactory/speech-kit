@@ -14,6 +14,18 @@ import 'package:speech_kit/src/domain/value_objects/permissions/speech_recogniti
 )
 external int _skSpeechAuthorizationStatus();
 
+@Native<Int32 Function()>(
+  symbol: 'sk_speech_recognition_usage_description_present',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external int _skSpeechRecognitionUsageDescriptionPresent();
+
+@Native<Int32 Function()>(
+  symbol: 'sk_microphone_usage_description_present',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external int _skMicrophoneUsageDescriptionPresent();
+
 @Native<
   Void Function(
     Pointer<NativeFunction<Void Function(Int32)>>,
@@ -46,6 +58,13 @@ external void _skRequestMicrophonePermission(
 
 SpeechRecognitionPermission _speechRecognitionPermissionFromCode(int code) {
   switch (code) {
+    case -1:
+      throw const SpeechKitException(
+        'Missing NSSpeechRecognitionUsageDescription in the app Info.plist. '
+        'Apple aborts the process if speech authorization is requested without '
+        'this key.',
+        failure: SpeechKitFailure.missingPrivacyUsageDescription,
+      );
     case 0:
       return SpeechRecognitionPermission.notDetermined;
     case 1:
@@ -95,6 +114,17 @@ Future<SpeechRecognitionPermission> speechRecognitionAuthorizationStatusImpl() {
 
 Future<SpeechRecognitionPermission> requestSpeechRecognitionPermissionImpl() {
   _ensureAppleDesktop();
+  if (_skSpeechRecognitionUsageDescriptionPresent() == 0) {
+    return Future.error(
+      const SpeechKitException(
+        'Cannot request speech recognition authorization: '
+        'NSSpeechRecognitionUsageDescription is missing from the main bundle '
+        'Info.plist. A plain `dart run` CLI has no such plist; use a macOS app '
+        'target or omit the request.',
+        failure: SpeechKitFailure.missingPrivacyUsageDescription,
+      ),
+    );
+  }
   final completer = Completer<SpeechRecognitionPermission>();
   late final NativeCallable<Void Function(Int32)> callback;
   callback = NativeCallable.listener((int code) {
@@ -120,10 +150,29 @@ Future<MicrophonePermission> microphonePermissionStatusImpl() {
 
 Future<bool> requestMicrophonePermissionImpl() {
   _ensureAppleDesktop();
+  if (_skMicrophoneUsageDescriptionPresent() == 0) {
+    return Future.error(
+      const SpeechKitException(
+        'Cannot request microphone access: NSMicrophoneUsageDescription is '
+        'missing from the main bundle Info.plist. Use a proper app bundle or '
+        'omit the request.',
+        failure: SpeechKitFailure.missingPrivacyUsageDescription,
+      ),
+    );
+  }
   final completer = Completer<bool>();
   late final NativeCallable<Void Function(Int32)> callback;
   callback = NativeCallable.listener((int granted) {
     try {
+      if (granted < 0) {
+        completer.completeError(
+          const SpeechKitException(
+            'Missing NSMicrophoneUsageDescription in the app Info.plist.',
+            failure: SpeechKitFailure.missingPrivacyUsageDescription,
+          ),
+        );
+        return;
+      }
       completer.complete(granted != 0);
     } on Object catch (e, st) {
       if (!completer.isCompleted) {

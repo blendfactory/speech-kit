@@ -6,6 +6,12 @@ permission queries with `speech_kit`. If speech recognition status is
 If the microphone is `undetermined`, it calls `SpeechKit.requestMicrophonePermission()`.
 Either flow may only work fully in a signed app with the right usage strings.
 
+Without `NSSpeechRecognitionUsageDescription` / `NSMicrophoneUsageDescription`
+in the **host app** `Info.plist`, Apple can **abort** the process if the native
+permission request runs. This package checks for those keys first; a plain
+`dart run` therefore skips the risky native call and prints a `SpeechKitException`
+message instead.
+
 ## Requirements
 
 - macOS with **Dart SDK 3.10+** (aligned with the main package)
