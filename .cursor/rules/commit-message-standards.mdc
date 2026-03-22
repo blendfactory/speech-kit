@@ -1,0 +1,63 @@
+---
+description: Conventional Commits-based commit message standards for this project, written in English and used by git commit skills.
+alwaysApply: false
+---
+
+# Commit Message Standards
+
+## Scope
+
+- Applies to **all git commits** in this repository.
+- Used especially by commit-related skills such as:
+  - `git-commit-staged`
+  - `git-commit-unstaged`
+
+## Format
+
+- Use **Conventional Commits** style:
+
+  ```text
+  type(scope): short summary
+  ```
+
+- **type examples**
+  - `feat`   — new feature
+  - `fix`    — bug fix
+  - `docs`   — documentation only
+  - `refactor` — refactoring without behavior change
+  - `test`   — adding or updating tests
+  - `chore`  — tooling, config, or other maintenance
+
+- **scope**
+  - Optional, but recommended when it clarifies the area of change.
+  - Examples: `license`, `native`, `dart`, `ci`, `docs`, `example`.
+
+## Summary Line
+
+- Write the summary in **English**.
+- Keep it concise (roughly up to 50 characters).
+- Do **not** end the summary with a period.
+- Describe what changed at a high level.
+
+## Body
+
+- Use the body when additional context or reasoning is helpful.
+- Explain **why** the change was made, or non-obvious details.
+- Use English prose, separated from the summary by a blank line.
+- **Include reference links** when applicable (e.g. official docs, specs, related issues, or external resources that informed the change).
+
+## Examples
+
+```text
+chore(license): add BSD 3-Clause license
+
+Initial license file for the speech_kit package repository.
+```
+
+```text
+feat(native): add speech recognizer bridge
+
+Expose authorization and recognizer lifecycle to Dart via FFI.
+
+Ref: https://developer.apple.com/documentation/speech
+```
