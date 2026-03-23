@@ -152,6 +152,17 @@ void main() {
         ),
       );
 
+      await expectLater(
+        kit.supportedCustomLanguagePhonemes(''),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
+
       // Analyzer session argument validation (native analysis requires a
       // real audio file + installed assets, which we don't do in unit tests).
       expect(

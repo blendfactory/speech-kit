@@ -136,6 +136,14 @@ class SpeechKit {
     return exportCustomLanguageModelDataImpl(request);
   }
 
+  /// Phoneme strings valid for [CustomLanguageModelPronunciation.phonemes] in
+  /// the given locale (`SFCustomLanguageModelData.supportedPhonemes`).
+  ///
+  /// **macOS 26+** with native dylib.
+  Future<List<String>> supportedCustomLanguagePhonemes(String localeId) {
+    return supportedCustomLanguagePhonemesImpl(localeId);
+  }
+
   /// Starts a file-based `SpeechAnalyzer` session and streams transcription
   /// results as [SpeechAnalysisSession.results].
   ///

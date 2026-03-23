@@ -66,7 +66,7 @@ Update rows as implementation progresses.
 | API / capability | Status | Notes |
 |------------------|--------|-------|
 | `AnalysisContext` / `contextualStrings` | ✅ | Dart: `AnalysisContext`; optional `SpeechKit.analyzeFile(..., analysisContext:)`; Swift `setContext` before `prepareToAnalyze`. |
-| `SFSpeechLanguageModel` (custom pronunciations / language model) | ✅ | **Training data:** Dart `SpeechKit.exportCustomLanguageModelData` (`CustomLanguageModelExportRequest`: phrase counts + custom pronunciations) → `SFCustomLanguageModelData.export(to:)`. **Compile:** `SpeechKit.prepareCustomLanguageModel` → `SFSpeechLanguageModel.prepareCustomLanguageModel(...)`. **Dictation:** `DictationTranscriberConfiguration.customLanguageModel` (`SpeechLanguageModelPaths`) → `ContentHint.customizedLanguage`. Advanced `SFCustomLanguageModelData` builders (template generators, `PhraseCountsFromTemplates`, etc.) are not bridged. |
+| `SFSpeechLanguageModel` (custom pronunciations / language model) | ✅ | **Training data:** Dart `SpeechKit.exportCustomLanguageModelData` (`CustomLanguageModelExportRequest`: phrase counts + custom pronunciations) → `SFCustomLanguageModelData.export(to:)`. **Compile:** `SpeechKit.prepareCustomLanguageModel` → `SFSpeechLanguageModel.prepareCustomLanguageModel(...)`. **Dictation:** `DictationTranscriberConfiguration.customLanguageModel` (`SpeechLanguageModelPaths`) → `ContentHint.customizedLanguage`. **`supportedPhonemes`:** Dart `SpeechKit.supportedCustomLanguagePhonemes`. Advanced `SFCustomLanguageModelData` builders (template generators, `PhraseCountsFromTemplates`, etc.) are not bridged. |
 
 ## README alignment
 

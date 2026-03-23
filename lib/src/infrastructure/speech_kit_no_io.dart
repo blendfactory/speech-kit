@@ -70,6 +70,10 @@ Future<void> exportCustomLanguageModelDataImpl(
   return Future.error(_noIo());
 }
 
+Future<List<String>> supportedCustomLanguagePhonemesImpl(String localeId) {
+  return Future.error(_noIo());
+}
+
 SpeechAnalysisSession analyzeFileImpl(
   String audioFilePath, {
   required List<SpeechModuleConfiguration> modules,
