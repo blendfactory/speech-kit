@@ -287,6 +287,15 @@ private let _analyzerSessionsLock = NSLock()
 private var _nextAnalyzerSessionId: Int32 = 1
 private var _analyzerSessions: [Int32: Task<Void, Never>] = [:]
 
+/// Removes a session entry from the global map. Must use `NSLock` only from
+/// synchronous call sites so Swift 6 does not treat `lock()` as crossing an
+/// async isolation boundary (see `runAnalyzerFileSession` `defer`).
+private func _unregisterAnalyzerSession(_ sessionId: Int32) {
+  _analyzerSessionsLock.lock()
+  defer { _analyzerSessionsLock.unlock() }
+  _analyzerSessions[sessionId] = nil
+}
+
 @available(macOS 26.0, *)
 private func sendSpeechTranscriberAnalyzerResult(
   _ result: SpeechTranscriber.Result,
@@ -364,9 +373,7 @@ private func runAnalyzerFileSession(
   }
 
   defer {
-    _analyzerSessionsLock.lock()
-    _analyzerSessions[sessionId] = nil
-    _analyzerSessionsLock.unlock()
+    _unregisterAnalyzerSession(sessionId)
   }
 
   let modulesStr = String(cString: modulesJsonUtf8)
