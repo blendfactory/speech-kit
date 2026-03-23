@@ -34,8 +34,19 @@ Flow matches Apple’s [`SpeechAnalyzer`](https://developer.apple.com/documentat
 |------------|------|
 | `DictationTranscriber` | Dictation-style module (parallel to `SpeechTranscriber`); exposed via `DictationTranscriberConfiguration` in Dart |
 | `SpeechDetector` | Voice-activity (VAD) module; Dart: `SpeechDetectorConfiguration` |
-| `AnalysisContext` | Shared context / `contextualStrings` bias; Dart: `AnalysisContext` → `SpeechKit.analyzeFile` |
+| `AnalysisContext` | Shared context / `contextualStrings` bias; Dart: `AnalysisContext` → `SpeechKit.analyzeFile` / `SpeechKit.analyzePcm` |
 | `SFSpeechLanguageModel` | Custom language model configuration (see framework docs; name retains `SF` prefix in Apple API) |
+
+---
+
+## Dart bridge mapping (analyzer input)
+
+| Path | Dart | Native |
+|------|------|--------|
+| File | `SpeechKit.analyzeFile` | `SpeechAnalyzer.analyzeSequence(from:)` on an audio file URL |
+| Single PCM buffer | `SpeechKit.analyzePcm` (`Uint8List` + `CompatibleAudioFormat`) | Builds one `AVAudioPCMBuffer`, wraps in `AnalyzerInput(buffer:)`, `analyzeSequence(_:)` |
+
+Streaming multiple buffers from Dart into one session is not implemented yet (Apple expects an `AsyncSequence` of `AnalyzerInput`).
 
 ---
 
