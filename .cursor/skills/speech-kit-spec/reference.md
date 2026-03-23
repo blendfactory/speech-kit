@@ -49,6 +49,14 @@ Flow matches Apple’s [`SpeechAnalyzer`](https://developer.apple.com/documentat
 
 Each chunk must be frame-aligned; empty chunks are skipped.
 
+### `prepareToAnalyze`
+
+| Dart | Native |
+|------|--------|
+| `prepareAudioFormat` (optional) + `onPrepareProgress` on `analyzeFile` / `analyzePcm` / `analyzePcmStream` | `prepareToAnalyze(in:withProgressReadyHandler:)`; progress uses KVO on `Progress.fractionCompleted`, forwarded as analyzer callback event type `2` (`{"fractionCompleted": …}`) |
+
+If `prepareAudioFormat` is omitted, the file’s `processingFormat` or the PCM `format` argument is used for preparation (matches Apple’s default).
+
 ---
 
 ## Errors and edge cases

@@ -59,7 +59,7 @@ Update rows as implementation progresses.
 | `analyzeSequence(_:)` or `start(inputSequence:)` | ✅ | File-based `analyzeSequence(from:)` supported. |
 | Result consumption (`SpeechTranscriber.results` / `AsyncSequence`) | ✅ | Swift drains `transcriber.results` and forwards each phrase to Dart `Stream<TranscriptionSegment>`. |
 | Finish / cancel (`finalizeAndFinish`, `cancelAndFinishNow`, …) | ✅ | Uses `finalizeAndFinish(through:)` or `cancelAndFinishNow()` depending on input. Stream cancel maps to native cancel. |
-| `prepareToAnalyze`, model retention / priority options (if exposed) | 🚧 | File sessions: Swift calls `prepareToAnalyze(in: audioFile.processingFormat, …)` before `analyzeSequence(from:)`. No Dart surface for custom format / progress handler yet. Model retention / priority TBD. |
+| `prepareToAnalyze`, model retention / priority options (if exposed) | 🚧 | Dart: optional `prepareAudioFormat` + `onPrepareProgress` (`fractionCompleted`) on `analyzeFile` / `analyzePcm` / `analyzePcmStream` → native `prepareToAnalyze(in:withProgressReadyHandler:)`. **Model retention / priority** TBD. |
 
 ### Custom language model (optional)
 
