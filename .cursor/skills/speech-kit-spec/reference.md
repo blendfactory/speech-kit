@@ -45,8 +45,9 @@ Flow matches Apple’s [`SpeechAnalyzer`](https://developer.apple.com/documentat
 |------|------|--------|
 | File | `SpeechKit.analyzeFile` | `SpeechAnalyzer.analyzeSequence(from:)` on an audio file URL |
 | Single PCM buffer | `SpeechKit.analyzePcm` (`Uint8List` + `CompatibleAudioFormat`) | Builds one `AVAudioPCMBuffer`, wraps in `AnalyzerInput(buffer:)`, `analyzeSequence(_:)` |
+| PCM stream (multi-chunk) | `SpeechKit.analyzePcmStream` (`Stream<Uint8List>` + `CompatibleAudioFormat`) | FFI push per chunk → `AnalyzerInput(buffer:)` per chunk; `finish_pcm_input` when the Dart stream completes |
 
-Streaming multiple buffers from Dart into one session is not implemented yet (Apple expects an `AsyncSequence` of `AnalyzerInput`).
+Each chunk must be frame-aligned; empty chunks are skipped.
 
 ---
 

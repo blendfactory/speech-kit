@@ -55,7 +55,7 @@ Update rows as implementation progresses.
 |------------------|--------|-------|
 | `SpeechAnalyzer` init with modules | ✅ | Swift uses `SpeechAnalyzer(modules:)` |
 | `SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:)` | ✅ | Dart: `SpeechKit.bestAvailableAudioFormat` → `CompatibleAudioFormat` (JSON from Swift `AVAudioFormat`). |
-| `AnalyzerInput` / buffer or file input | 🚧 | File: `analyzeSequence(from:)`. In-memory: `SpeechKit.analyzePcm` → one `AnalyzerInput` + `analyzeSequence(_:)` (multi-chunk streaming from Dart not yet). |
+| `AnalyzerInput` / buffer or file input | ✅ | File: `analyzeSequence(from:)`. In-memory: `SpeechKit.analyzePcm` (single buffer) or `SpeechKit.analyzePcmStream` (`Stream<Uint8List>` → multiple `AnalyzerInput`). |
 | `analyzeSequence(_:)` or `start(inputSequence:)` | ✅ | File-based `analyzeSequence(from:)` supported. |
 | Result consumption (`SpeechTranscriber.results` / `AsyncSequence`) | ✅ | Swift drains `transcriber.results` and forwards each phrase to Dart `Stream<TranscriptionSegment>`. |
 | Finish / cancel (`finalizeAndFinish`, `cancelAndFinishNow`, …) | ✅ | Uses `finalizeAndFinish(through:)` or `cancelAndFinishNow()` depending on input. Stream cancel maps to native cancel. |
