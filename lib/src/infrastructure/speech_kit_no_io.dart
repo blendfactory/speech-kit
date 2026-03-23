@@ -1,3 +1,4 @@
+import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
@@ -34,4 +35,11 @@ Future<void> ensureAssetsInstalledImpl(
   List<SpeechModuleConfiguration> modules,
 ) {
   return Future.error(_noIo());
+}
+
+SpeechAnalysisSession analyzeFileImpl(
+  String audioFilePath, {
+  required List<SpeechModuleConfiguration> modules,
+}) {
+  throw _noIo();
 }

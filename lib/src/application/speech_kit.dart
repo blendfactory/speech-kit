@@ -1,5 +1,5 @@
 import 'package:meta/meta.dart';
-
+import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
@@ -59,6 +59,25 @@ class SpeechKit {
   /// models. Only `SpeechTranscriberConfiguration` entries are supported.
   Future<void> ensureAssetsInstalled(List<SpeechModuleConfiguration> modules) {
     return ensureAssetsInstalledImpl(modules);
+  }
+
+  /// Starts a file-based `SpeechAnalyzer` session and streams transcription
+  /// results as [SpeechAnalysisSession.results].
+  ///
+  /// Notes:
+  /// - This first release focuses on file input
+  ///   (`SpeechAnalyzer.analyzeSequence(from:)`).
+  /// - Call [SpeechAnalysisSession.finalizeAndFinish] or
+  ///   [SpeechAnalysisSession.cancelAndFinishNow] to end the native session
+  ///   explicitly when needed.
+  SpeechAnalysisSession analyzeFile(
+    String audioFilePath, {
+    required List<SpeechModuleConfiguration> modules,
+  }) {
+    return analyzeFileImpl(
+      audioFilePath,
+      modules: modules,
+    );
   }
 
   @override

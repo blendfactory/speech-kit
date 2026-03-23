@@ -29,6 +29,22 @@ void main() {
         ),
       ]);
       expect(status, isA<AssetInventoryStatus>());
+
+      // Analyzer session argument validation (native analysis requires a
+      // real audio file + installed assets, which we don't do in unit tests).
+      expect(
+        () => kit.analyzeFile(
+          '',
+          modules: const [],
+        ),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
     } else {
       await expectLater(
         kit.speechRecognitionAuthorizationStatus(),

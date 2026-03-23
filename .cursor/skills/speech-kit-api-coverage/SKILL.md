@@ -32,20 +32,20 @@ Update rows as implementation progresses.
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| Speech + microphone consent (`Info.plist` usage strings + runtime authorization per Apple docs) | 🚧 | **macOS:** native dylib calls `+[SFSpeechRecognizer requestAuthorization:]` + `AVAudioApplication` record permission; Dart exposes `SpeechRecognitionPermission` / `MicrophonePermission` only. **iOS:** hook builds macOS asset only—add iOS build + embedder testing. Callers must still ship `NSSpeechRecognitionUsageDescription` / microphone usage strings. |
+| Speech + microphone consent (`Info.plist` usage strings + runtime authorization per Apple docs) | ✅ | **macOS:** native dylib calls `+[SFSpeechRecognizer requestAuthorization:]` + `AVAudioApplication` record permission; Dart exposes `SpeechRecognitionPermission` / `MicrophonePermission` only. Callers must still ship `NSSpeechRecognitionUsageDescription` / microphone usage strings. |
 
 ### Asset inventory
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| `AssetInventory.status(forModules:)` | 🚧 | Dart: `SpeechKit.assetInventoryStatus` + `SpeechTranscriberConfiguration`; native Swift bridge **not** wired—throws `SpeechKitFailure.notImplemented`. |
-| `AssetInventory.assetInstallationRequest(supporting:)` + install | 🚧 | Dart: `SpeechKit.ensureAssetsInstalled`; native **not** wired—throws `notImplemented`. |
+| `AssetInventory.status(forModules:)` | ✅ | Dart: `SpeechKit.assetInventoryStatus` + `SpeechTranscriberConfiguration`; Swift bridge maps `SpeechTranscriber` modules → `AssetInventory.status`. |
+| `AssetInventory.assetInstallationRequest(supporting:)` + install | ✅ | Dart: `SpeechKit.ensureAssetsInstalled`; Swift bridge maps modules → `assetInstallationRequest` → `downloadAndInstall`. |
 
 ### Transcription module
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| `SpeechTranscriber` (locale, presets/options) | 🚧 | Dart: `SpeechTranscriberConfiguration`, `SpeechTranscriberPreset`; no native module construction yet. |
+| `SpeechTranscriber` (locale, presets/options) | ✅ | Dart: `SpeechTranscriberConfiguration`, `SpeechTranscriberPreset`; Swift constructs `SpeechTranscriber(locale:preset:)` for both asset inventory and file-based analysis. |
 | `DictationTranscriber` (optional) | ❌ | |
 | `SpeechDetector` (optional) | ❌ | |
 
@@ -53,12 +53,12 @@ Update rows as implementation progresses.
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| `SpeechAnalyzer` init with modules | ❌ | |
-| `SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:)` | ❌ | |
-| `AnalyzerInput` / buffer or file input | ❌ | |
-| `analyzeSequence(_:)` or `start(inputSequence:)` | ❌ | |
-| Result consumption (`SpeechTranscriber.results` / `AsyncSequence`) | ❌ | Map to Dart `Stream` or similar |
-| Finish / cancel (`finalizeAndFinish`, `cancelAndFinishNow`, …) | ❌ | |
+| `SpeechAnalyzer` init with modules | ✅ | Swift uses `SpeechAnalyzer(modules:)` |
+| `SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:)` | ❌ | Not called in this first implementation (uses file-based `analyzeSequence(from:)`). |
+| `AnalyzerInput` / buffer or file input | 🚧 | File input supported via `SpeechAnalyzer.analyzeSequence(from:)`. Buffer input (`AnalyzerInput` + `AsyncSequence`) not yet. |
+| `analyzeSequence(_:)` or `start(inputSequence:)` | ✅ | File-based `analyzeSequence(from:)` supported. |
+| Result consumption (`SpeechTranscriber.results` / `AsyncSequence`) | ✅ | Swift drains `transcriber.results` and forwards each phrase to Dart `Stream<TranscriptionSegment>`. |
+| Finish / cancel (`finalizeAndFinish`, `cancelAndFinishNow`, …) | ✅ | Uses `finalizeAndFinish(through:)` or `cancelAndFinishNow()` depending on input. Stream cancel maps to native cancel. |
 | `prepareToAnalyze`, model retention / priority options (if exposed) | ❌ | |
 
 ### Custom language model (optional)
