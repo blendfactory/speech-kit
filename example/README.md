@@ -90,5 +90,25 @@ dart run bin/asset_inventory.dart --locale en-US --install
 | `lib/permission_status_sample.dart` | Shared sample logic |
 | `bin/asset_inventory.dart` | CLI entry for AssetInventory |
 | `lib/asset_inventory_sample.dart` | Asset status / optional install sample |
+| `bin/analyze_file.dart` | CLI entry for file-based transcription |
+| `lib/analyze_file_sample.dart` | Shared logic for `analyzeFile` |
 | `macos_bundle/Info.plist` | Template plist for the bundled AOT demo |
 | `scripts/build_macos_permission_app.sh` | Builds `build/PermissionStatusDemo.app` |
+
+## Analyze a local audio file (SpeechAnalyzer)
+
+Place a supported audio file yourself (for example under `assets/`) and pass
+its path when you run the sample. **No audio is downloaded or committed** by
+this repository; you are responsible for licensing and format.
+
+**Requires macOS 26+** (same as the parent package’s `SpeechAnalyzer` bridge).
+
+```bash
+dart pub get
+# Example: file you copied to example/assets/ (gitignored except README)
+dart run bin/analyze_file.dart assets/my_sample.wav
+dart run bin/analyze_file.dart --audio /absolute/path/to/sample.m4a --locale ja-JP
+dart run bin/analyze_file.dart assets/my_sample.wav --install
+```
+
+See `example/assets/README.md` for notes on local assets.
