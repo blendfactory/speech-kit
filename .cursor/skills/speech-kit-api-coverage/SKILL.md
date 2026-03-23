@@ -59,14 +59,14 @@ Update rows as implementation progresses.
 | `analyzeSequence(_:)` or `start(inputSequence:)` | ✅ | File-based `analyzeSequence(from:)` supported. |
 | Result consumption (`SpeechTranscriber.results` / `AsyncSequence`) | ✅ | Swift drains `transcriber.results` and forwards each phrase to Dart `Stream<TranscriptionSegment>`. |
 | Finish / cancel (`finalizeAndFinish`, `cancelAndFinishNow`, …) | ✅ | Uses `finalizeAndFinish(through:)` or `cancelAndFinishNow()` depending on input. Stream cancel maps to native cancel. |
-| `prepareToAnalyze`, model retention / priority options (if exposed) | 🚧 | Dart: optional `prepareAudioFormat` + `onPrepareProgress` (`fractionCompleted`) on `analyzeFile` / `analyzePcm` / `analyzePcmStream` → native `prepareToAnalyze(in:withProgressReadyHandler:)`. **Model retention / priority** TBD. |
+| `prepareToAnalyze`, model retention / priority options | 🚧 | **SDK (MacOSX 26.2):** `prepareToAnalyze` is public on `SpeechAnalyzer` (with and without `Progress` handler). **`SpeechAnalyzer.Options`** is public: `init(priority: TaskPriority, modelRetention:)` where `modelRetention` is `whileInUse` \| `lingering` \| `processLifetime`; **`SpeechModels.endRetention()`** exists (async). **Package:** `prepareAudioFormat` + `onPrepareProgress` bridged; **`Options` not bridged** — native uses `SpeechAnalyzer(modules:)` only (default `options: nil`). |
 
 ### Custom language model (optional)
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
 | `AnalysisContext` / `contextualStrings` | ✅ | Dart: `AnalysisContext`; optional `SpeechKit.analyzeFile(..., analysisContext:)`; Swift `setContext` before `prepareToAnalyze`. |
-| `SFSpeechLanguageModel` (custom pronunciations / language model) | ❌ | Apple types may retain `SF` prefix; not bridged yet. |
+| `SFSpeechLanguageModel` (custom pronunciations / language model) | ❌ | **SDK:** `SFSpeechLanguageModel` + `SFSpeechLanguageModel.Configuration` (ObjC headers); `prepareCustomLanguageModelForUrl:configuration:…`; Swift `DictationTranscriber.ContentHint.customizedLanguage(modelConfiguration:)`. **`SFCustomLanguageModelData`** in `Speech.swiftinterface` for building/exporting training data. Not bridged in package yet. |
 
 ## README alignment
 
