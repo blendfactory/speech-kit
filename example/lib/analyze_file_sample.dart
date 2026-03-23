@@ -43,6 +43,10 @@ Future<int> runAnalyzeFileSample({
     final session = kit.analyzeFile(
       absolutePath,
       modules: modules,
+      // Optional bias vocabulary:
+      // analysisContext: const AnalysisContext(
+      //   contextualStringsByTag: {'general': ['AcmeCorp']},
+      // ),
     );
 
     await for (final segment in session.results) {

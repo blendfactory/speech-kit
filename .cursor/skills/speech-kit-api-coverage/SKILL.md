@@ -65,7 +65,8 @@ Update rows as implementation progresses.
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| `SFSpeechLanguageModel` / `AnalysisContext` hooks | ❌ | Apple types may retain `SF` prefix; still part of module API, not legacy recognizer |
+| `AnalysisContext` / `contextualStrings` | ✅ | Dart: `AnalysisContext`; optional `SpeechKit.analyzeFile(..., analysisContext:)`; Swift `setContext` before `prepareToAnalyze`. |
+| `SFSpeechLanguageModel` (custom pronunciations / language model) | ❌ | Apple types may retain `SF` prefix; not bridged yet. |
 
 ## README alignment
 

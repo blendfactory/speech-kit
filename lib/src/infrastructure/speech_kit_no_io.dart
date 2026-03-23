@@ -1,4 +1,5 @@
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
+import 'package:speech_kit/src/domain/value_objects/analysis/analysis_context.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
@@ -47,6 +48,7 @@ Future<CompatibleAudioFormat> bestAvailableAudioFormatImpl(
 SpeechAnalysisSession analyzeFileImpl(
   String audioFilePath, {
   required List<SpeechModuleConfiguration> modules,
+  AnalysisContext? analysisContext,
 }) {
   throw _noIo();
 }

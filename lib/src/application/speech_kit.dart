@@ -3,6 +3,7 @@ library;
 
 import 'package:meta/meta.dart';
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
+import 'package:speech_kit/src/domain/value_objects/analysis/analysis_context.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
@@ -85,16 +86,21 @@ class SpeechKit {
   /// Notes:
   /// - This first release focuses on file input
   ///   (`SpeechAnalyzer.analyzeSequence(from:)`).
+  /// - Optional [analysisContext] maps to Apple
+  ///   `AnalysisContext.contextualStrings` (bias vocabulary) via native
+  ///   `setContext` before analysis.
   /// - Call [SpeechAnalysisSession.finalizeAndFinish] or
   ///   [SpeechAnalysisSession.cancelAndFinishNow] to end the native session
   ///   explicitly when needed.
   SpeechAnalysisSession analyzeFile(
     String audioFilePath, {
     required List<SpeechModuleConfiguration> modules,
+    AnalysisContext? analysisContext,
   }) {
     return analyzeFileImpl(
       audioFilePath,
       modules: modules,
+      analysisContext: analysisContext,
     );
   }
 

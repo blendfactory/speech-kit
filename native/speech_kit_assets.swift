@@ -94,6 +94,45 @@ private func parseModules(data: Data) throws -> [any SpeechModule] {
 }
 
 @available(macOS 26.0, *)
+private func analysisContextFromJsonUtf8(
+  _ utf8: UnsafePointer<CChar>?,
+) throws -> AnalysisContext? {
+  guard let utf8 else { return nil }
+  let str = String(cString: utf8)
+  guard let data = str.data(using: .utf8) else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid utf-8 analysis context JSON"],
+    )
+  }
+  guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid analysis context JSON root"],
+    )
+  }
+  guard let contextual = root["contextualStrings"] as? [String: Any],
+        !contextual.isEmpty
+  else {
+    return nil
+  }
+  let ctx = AnalysisContext()
+  for (tagStr, valueAny) in contextual {
+    guard let arr = valueAny as? [String] else { continue }
+    let tag: AnalysisContext.ContextualStringsTag
+    if tagStr == "general" {
+      tag = .general
+    } else {
+      tag = AnalysisContext.ContextualStringsTag(tagStr)
+    }
+    ctx.contextualStrings[tag] = arr
+  }
+  return ctx
+}
+
+@available(macOS 26.0, *)
 private func encodeStatus(_ status: AssetInventory.Status) -> Int32 {
   switch status {
   case .unsupported: return 0
@@ -315,6 +354,7 @@ private func sendDictationTranscriberAnalyzerResult(
 private func runAnalyzerFileSession(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   audioFilePathUtf8: UnsafePointer<CChar>?,
+  analysisContextJsonUtf8: UnsafePointer<CChar>?,
   sessionId: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) async {
@@ -363,6 +403,9 @@ private func runAnalyzerFileSession(
     }
 
     analyzer = SpeechAnalyzer(modules: modules)
+    if let ctx = try analysisContextFromJsonUtf8(analysisContextJsonUtf8) {
+      try await analyzer!.setContext(ctx)
+    }
     let audioURL = URL(fileURLWithPath: audioPath)
     let audioFile = try AVAudioFile(forReading: audioURL)
 
@@ -419,6 +462,7 @@ private func runAnalyzerFileSession(
 public func sk_speech_analyzer_analyze_file_async(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   audioFilePathUtf8: UnsafePointer<CChar>?,
+  analysisContextJsonUtf8: UnsafePointer<CChar>?,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) -> Int32 {
   if #unavailable(macOS 26.0) {
@@ -435,6 +479,7 @@ public func sk_speech_analyzer_analyze_file_async(
     await runAnalyzerFileSession(
       modulesJsonUtf8: modulesJsonUtf8,
       audioFilePathUtf8: audioFilePathUtf8,
+      analysisContextJsonUtf8: analysisContextJsonUtf8,
       sessionId: sessionId,
       callback: callback,
     )

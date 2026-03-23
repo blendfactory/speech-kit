@@ -6,6 +6,7 @@ import 'dart:io' show Platform;
 import 'package:ffi/ffi.dart';
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/errors/speech_kit_exception.dart';
+import 'package:speech_kit/src/domain/value_objects/analysis/analysis_context.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
@@ -117,6 +118,7 @@ typedef SkSpeechAnalyzerEventCallbackNative =
   Int32 Function(
     Pointer<Utf8>,
     Pointer<Utf8>,
+    Pointer<Utf8>,
     Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>>,
   )
 >(
@@ -126,6 +128,7 @@ typedef SkSpeechAnalyzerEventCallbackNative =
 external int _skSpeechAnalyzerAnalyzeFileAsync(
   Pointer<Utf8> modulesJsonUtf8,
   Pointer<Utf8> audioFilePathUtf8,
+  Pointer<Utf8> analysisContextJsonUtf8,
   Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>> callback,
 );
 
@@ -198,6 +201,18 @@ String? _mallocUtf8ToDartAndFree(Pointer<Utf8> ptr) {
   } finally {
     malloc.free(ptr);
   }
+}
+
+String? _encodeAnalysisContextJson(AnalysisContext? context) {
+  if (context == null) {
+    return null;
+  }
+  if (context.contextualStringsByTag.isEmpty) {
+    return null;
+  }
+  return jsonEncode(<String, Object>{
+    'contextualStrings': context.contextualStringsByTag,
+  });
 }
 
 String _encodeSpeechModulesJson(List<SpeechModuleConfiguration> modules) {
@@ -482,6 +497,7 @@ Duration _durationFromSeconds(double seconds) {
 SpeechAnalysisSession analyzeFileImpl(
   String audioFilePath, {
   required List<SpeechModuleConfiguration> modules,
+  AnalysisContext? analysisContext,
 }) {
   _ensureAppleDesktop();
   if (audioFilePath.isEmpty) {
@@ -593,16 +609,24 @@ SpeechAnalysisSession analyzeFileImpl(
   final modulesJson = _encodeSpeechModulesJson(modules);
   final modulesJsonPtr = modulesJson.toNativeUtf8();
   final audioFilePathPtr = audioFilePath.toNativeUtf8();
+  final contextJson = _encodeAnalysisContextJson(analysisContext);
+  final contextJsonPtr = contextJson == null
+      ? nullptr
+      : contextJson.toNativeUtf8();
 
   try {
     nativeSessionId = _skSpeechAnalyzerAnalyzeFileAsync(
       modulesJsonPtr,
       audioFilePathPtr,
+      contextJsonPtr,
       callback.nativeFunction,
     );
   } finally {
     malloc.free(modulesJsonPtr);
     malloc.free(audioFilePathPtr);
+    if (contextJsonPtr != nullptr) {
+      malloc.free(contextJsonPtr);
+    }
   }
 
   return SpeechAnalysisSession(
