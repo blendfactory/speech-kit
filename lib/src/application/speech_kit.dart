@@ -94,6 +94,34 @@ class SpeechKit {
     return endSpeechModelRetentionImpl();
   }
 
+  /// Builds compiled language model files from on-disk training data
+  /// (`SFSpeechLanguageModel.prepareCustomLanguageModelForUrl`).
+  ///
+  /// [trainingDataAssetPath] must point to data compatible with Apple’s
+  /// `SFCustomLanguageModelData.export(to:)` (building that data in Dart is not
+  /// supported yet). On success, the system writes [outputLanguageModelPath]
+  /// and optionally [outputVocabularyPath].
+  ///
+  /// [weight] (0.0–1.0) is supported on **macOS 26+ / iOS 26+** when using the
+  /// three-argument `Configuration` initializer.
+  ///
+  /// **macOS 26+** with native dylib.
+  Future<void> prepareCustomLanguageModel({
+    required String trainingDataAssetPath,
+    required String outputLanguageModelPath,
+    String? outputVocabularyPath,
+    double? weight,
+    bool ignoresCache = false,
+  }) {
+    return prepareCustomLanguageModelImpl(
+      trainingDataAssetPath: trainingDataAssetPath,
+      outputLanguageModelPath: outputLanguageModelPath,
+      outputVocabularyPath: outputVocabularyPath,
+      weight: weight,
+      ignoresCache: ignoresCache,
+    );
+  }
+
   /// Starts a file-based `SpeechAnalyzer` session and streams transcription
   /// results as [SpeechAnalysisSession.results].
   ///

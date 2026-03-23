@@ -8,6 +8,50 @@ private func dupCString(_ s: String) -> UnsafeMutablePointer<CChar>? {
   s.withCString { strdup($0) }
 }
 
+/// JSON keys: `languageModelPath`, optional `vocabularyPath`, optional `weight` (0.0–1.0).
+@available(macOS 26.0, *)
+private func speechLanguageModelConfigurationFromPathsDict(
+  _ dict: [String: Any],
+) throws -> SFSpeechLanguageModel.Configuration {
+  let lmPath = dict["languageModelPath"] as? String ?? ""
+  guard !lmPath.isEmpty else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 3,
+      userInfo: [NSLocalizedDescriptionKey: "languageModelPath must be non-empty"],
+    )
+  }
+  let lmURL = URL(fileURLWithPath: lmPath)
+  let vocabStr = dict["vocabularyPath"] as? String
+  let weight = dict["weight"] as? Double
+  if let w = weight, w < 0 || w > 1 {
+    throw NSError(
+      domain: "speech_kit",
+      code: 3,
+      userInfo: [NSLocalizedDescriptionKey: "weight must be between 0.0 and 1.0"],
+    )
+  }
+  if let v = vocabStr, !v.isEmpty {
+    let vURL = URL(fileURLWithPath: v)
+    if let w = weight {
+      return SFSpeechLanguageModel.Configuration(
+        languageModel: lmURL,
+        vocabulary: vURL,
+        weight: NSNumber(value: w),
+      )
+    }
+    return SFSpeechLanguageModel.Configuration(languageModel: lmURL, vocabulary: vURL)
+  }
+  if let w = weight {
+    return SFSpeechLanguageModel.Configuration(
+      languageModel: lmURL,
+      vocabulary: nil,
+      weight: NSNumber(value: w),
+    )
+  }
+  return SFSpeechLanguageModel.Configuration(languageModel: lmURL)
+}
+
 @available(macOS 26.0, *)
 private func parseModules(data: Data) throws -> [any SpeechModule] {
   guard let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
@@ -58,7 +102,24 @@ private func parseModules(data: Data) throws -> [any SpeechModule] {
           userInfo: [NSLocalizedDescriptionKey: "Invalid DictationTranscriber preset index"],
         )
       }
-      out.append(DictationTranscriber(locale: locale, preset: preset))
+      if let lmDict = item["customLanguageModel"] as? [String: Any] {
+        let cfg = try speechLanguageModelConfigurationFromPathsDict(lmDict)
+        var hints = preset.contentHints
+        hints.insert(
+          DictationTranscriber.ContentHint.customizedLanguage(modelConfiguration: cfg),
+        )
+        out.append(
+          DictationTranscriber(
+            locale: locale,
+            contentHints: hints,
+            transcriptionOptions: preset.transcriptionOptions,
+            reportingOptions: preset.reportingOptions,
+            attributeOptions: preset.attributeOptions,
+          ),
+        )
+      } else {
+        out.append(DictationTranscriber(locale: locale, preset: preset))
+      }
 
     case "speechDetector":
       let sensIdx = item["sensitivity"] as? Int ?? 1
@@ -1211,5 +1272,65 @@ public func sk_speech_models_end_retention_async(
   Task {
     await SpeechModels.endRetention()
     callback(0, 0, nil)
+  }
+}
+
+@_cdecl("sk_speech_prepare_custom_language_model_async")
+public func sk_speech_prepare_custom_language_model_async(
+  jsonUtf8: UnsafePointer<CChar>?,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) {
+  if #unavailable(macOS 26.0) {
+    callback(-1, 4, dupCString("SFSpeechLanguageModel requires macOS 26"))
+    return
+  }
+  guard let jsonUtf8 else {
+    callback(-1, 1, dupCString("Missing JSON"))
+    return
+  }
+  let str = String(cString: jsonUtf8)
+  guard let data = str.data(using: .utf8),
+        let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+  else {
+    callback(-1, 1, dupCString("Invalid prepareCustomLanguageModel JSON"))
+    return
+  }
+  let assetPath = root["trainingDataAssetPath"] as? String ?? ""
+  let outLmPath = root["outputLanguageModelPath"] as? String ?? ""
+  guard !assetPath.isEmpty, !outLmPath.isEmpty else {
+    callback(
+      -1,
+      1,
+      dupCString("trainingDataAssetPath and outputLanguageModelPath are required"),
+    )
+    return
+  }
+  let assetURL = URL(fileURLWithPath: assetPath)
+  var lmDict: [String: Any] = ["languageModelPath": outLmPath]
+  if let v = root["outputVocabularyPath"] as? String, !v.isEmpty {
+    lmDict["vocabularyPath"] = v
+  }
+  if let w = root["weight"] as? Double {
+    lmDict["weight"] = w
+  }
+  let config: SFSpeechLanguageModel.Configuration
+  do {
+    config = try speechLanguageModelConfigurationFromPathsDict(lmDict)
+  } catch {
+    let ns = error as NSError
+    callback(-1, 1, dupCString(ns.localizedDescription))
+    return
+  }
+  let ignoresCache = root["ignoresCache"] as? Bool ?? false
+  SFSpeechLanguageModel.prepareCustomLanguageModel(
+    for: assetURL,
+    configuration: config,
+    ignoresCache: ignoresCache,
+  ) { error in
+    if let error {
+      callback(-1, 1, dupCString(error.localizedDescription))
+    } else {
+      callback(0, 0, nil)
+    }
   }
 }

@@ -121,6 +121,20 @@ external void _skSpeechModelsEndRetentionAsync(
   Pointer<NativeFunction<SkAssetCallbackNative>> callback,
 );
 
+@Native<
+  Void Function(
+    Pointer<Utf8>,
+    Pointer<NativeFunction<SkAssetCallbackNative>>,
+  )
+>(
+  symbol: 'sk_speech_prepare_custom_language_model_async',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external void _skSpeechPrepareCustomLanguageModelAsync(
+  Pointer<Utf8> jsonUtf8,
+  Pointer<NativeFunction<SkAssetCallbackNative>> callback,
+);
+
 typedef SkSpeechAnalyzerEventCallbackNative =
     Void Function(
       Int32 eventType,
@@ -330,11 +344,17 @@ String _encodeSpeechModulesJson(List<SpeechModuleConfiguration> modules) {
           'locale': localeId,
           'preset': preset.index,
         });
-      case DictationTranscriberConfiguration(:final localeId, :final preset):
+      case DictationTranscriberConfiguration(
+        :final localeId,
+        :final preset,
+        :final customLanguageModel,
+      ):
         list.add({
           'kind': 'dictation',
           'locale': localeId,
           'preset': preset.index,
+          if (customLanguageModel != null)
+            'customLanguageModel': customLanguageModel.toJson(),
         });
       case SpeechDetectorConfiguration(
         :final sensitivity,
@@ -615,6 +635,68 @@ Future<void> endSpeechModelRetentionImpl() {
     }
   });
   _skSpeechModelsEndRetentionAsync(callback.nativeFunction);
+  return completer.future;
+}
+
+Future<void> prepareCustomLanguageModelImpl({
+  required String trainingDataAssetPath,
+  required String outputLanguageModelPath,
+  String? outputVocabularyPath,
+  double? weight,
+  bool ignoresCache = false,
+}) {
+  _ensureAppleDesktop();
+  if (trainingDataAssetPath.isEmpty || outputLanguageModelPath.isEmpty) {
+    return Future.error(
+      const SpeechKitException(
+        'trainingDataAssetPath and outputLanguageModelPath must be non-empty.',
+        failure: SpeechKitFailure.operationFailed,
+      ),
+    );
+  }
+  if (weight != null && (weight < 0 || weight > 1)) {
+    return Future.error(
+      const SpeechKitException(
+        'weight must be between 0.0 and 1.0.',
+        failure: SpeechKitFailure.operationFailed,
+      ),
+    );
+  }
+  final payload = <String, Object?>{
+    'trainingDataAssetPath': trainingDataAssetPath,
+    'outputLanguageModelPath': outputLanguageModelPath,
+    'outputVocabularyPath': ?outputVocabularyPath,
+    'weight': ?weight,
+    'ignoresCache': ignoresCache,
+  };
+  final json = jsonEncode(payload);
+  final jsonPtr = json.toNativeUtf8();
+  final completer = Completer<void>();
+  late final NativeCallable<Void Function(Int32, Int32, Pointer<Utf8>)>
+  callback;
+  callback = NativeCallable.listener((int _, int err, Pointer<Utf8> msg) {
+    try {
+      if (err != 0) {
+        final text = _mallocUtf8ToDartAndFree(msg);
+        completer.completeError(
+          SpeechKitException(
+            text ?? 'prepareCustomLanguageModel failed (error code $err)',
+            failure: SpeechKitFailure.operationFailed,
+          ),
+        );
+        return;
+      }
+      completer.complete();
+    } on Object catch (e, st) {
+      if (!completer.isCompleted) {
+        completer.completeError(e, st);
+      }
+    } finally {
+      malloc.free(jsonPtr);
+      callback.close();
+    }
+  });
+  _skSpeechPrepareCustomLanguageModelAsync(jsonPtr, callback.nativeFunction);
   return completer.future;
 }
 

@@ -53,6 +53,16 @@ Future<void> endSpeechModelRetentionImpl() {
   return Future.error(_noIo());
 }
 
+Future<void> prepareCustomLanguageModelImpl({
+  required String trainingDataAssetPath,
+  required String outputLanguageModelPath,
+  String? outputVocabularyPath,
+  double? weight,
+  bool ignoresCache = false,
+}) {
+  return Future.error(_noIo());
+}
+
 SpeechAnalysisSession analyzeFileImpl(
   String audioFilePath, {
   required List<SpeechModuleConfiguration> modules,

@@ -66,7 +66,7 @@ Update rows as implementation progresses.
 | API / capability | Status | Notes |
 |------------------|--------|-------|
 | `AnalysisContext` / `contextualStrings` | ✅ | Dart: `AnalysisContext`; optional `SpeechKit.analyzeFile(..., analysisContext:)`; Swift `setContext` before `prepareToAnalyze`. |
-| `SFSpeechLanguageModel` (custom pronunciations / language model) | ❌ | **SDK:** `SFSpeechLanguageModel` + `SFSpeechLanguageModel.Configuration` (ObjC headers); `prepareCustomLanguageModelForUrl:configuration:…`; Swift `DictationTranscriber.ContentHint.customizedLanguage(modelConfiguration:)`. **`SFCustomLanguageModelData`** in `Speech.swiftinterface` for building/exporting training data. Not bridged in package yet. |
+| `SFSpeechLanguageModel` (custom pronunciations / language model) | ✅ | **Prepare:** Dart `SpeechKit.prepareCustomLanguageModel` → `SFSpeechLanguageModel.prepareCustomLanguageModel(for:configuration:ignoresCache:completion:)`. **Use in dictation:** `DictationTranscriberConfiguration.customLanguageModel` (`SpeechLanguageModelPaths`) → `ContentHint.customizedLanguage` + full `DictationTranscriber` init from preset options. **`SFCustomLanguageModelData` / `export(to:)`** to build training data files: not bridged in Dart yet (prepare expects a compatible on-disk asset). |
 
 ## README alignment
 

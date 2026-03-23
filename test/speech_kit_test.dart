@@ -10,6 +10,19 @@ void main() {
     expect(kit, isA<SpeechKit>());
   });
 
+  test('SpeechLanguageModelPaths maps to bridge JSON keys', () {
+    const o = SpeechLanguageModelPaths(
+      languageModelPath: '/tmp/model',
+      vocabularyPath: '/tmp/vocab',
+      weight: 0.5,
+    );
+    expect(o.toJson(), {
+      'languageModelPath': '/tmp/model',
+      'vocabularyPath': '/tmp/vocab',
+      'weight': 0.5,
+    });
+  });
+
   test('SpeechAnalyzerOptions maps to bridge JSON keys', () {
     const o = SpeechAnalyzerOptions(
       taskPriority: SpeechAnalyzerTaskPriority.low,
@@ -70,6 +83,35 @@ void main() {
       expect(vadStatus, isA<AssetInventoryStatus>());
 
       await expectLater(kit.endSpeechModelRetention(), completes);
+
+      await expectLater(
+        kit.prepareCustomLanguageModel(
+          trainingDataAssetPath: '',
+          outputLanguageModelPath: '/tmp/out',
+        ),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
+
+      await expectLater(
+        kit.prepareCustomLanguageModel(
+          trainingDataAssetPath: '/tmp/in',
+          outputLanguageModelPath: '/tmp/out',
+          weight: 2,
+        ),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
 
       // Analyzer session argument validation (native analysis requires a
       // real audio file + installed assets, which we don't do in unit tests).
