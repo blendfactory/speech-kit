@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
@@ -129,6 +130,28 @@ external int _skSpeechAnalyzerAnalyzeFileAsync(
   Pointer<Utf8> modulesJsonUtf8,
   Pointer<Utf8> audioFilePathUtf8,
   Pointer<Utf8> analysisContextJsonUtf8,
+  Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>> callback,
+);
+
+@Native<
+  Int32 Function(
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Uint8>,
+    Int64,
+    Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>>,
+  )
+>(
+  symbol: 'sk_speech_analyzer_analyze_pcm_async',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external int _skSpeechAnalyzerAnalyzePcmAsync(
+  Pointer<Utf8> modulesJsonUtf8,
+  Pointer<Utf8> formatJsonUtf8,
+  Pointer<Utf8> analysisContextJsonUtf8,
+  Pointer<Uint8> pcmBytes,
+  int pcmByteLength,
   Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>> callback,
 );
 
@@ -494,18 +517,13 @@ Duration _durationFromSeconds(double seconds) {
   return Duration(microseconds: micros);
 }
 
-SpeechAnalysisSession analyzeFileImpl(
-  String audioFilePath, {
-  required List<SpeechModuleConfiguration> modules,
+SpeechAnalysisSession _speechAnalysisSessionFromNative(
+  List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
-}) {
+  int Function(Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>>)
+  invokeNative,
+) {
   _ensureAppleDesktop();
-  if (audioFilePath.isEmpty) {
-    throw const SpeechKitException(
-      'audioFilePath must be non-empty.',
-      failure: SpeechKitFailure.operationFailed,
-    );
-  }
   if (modules.isEmpty) {
     throw const SpeechKitException(
       'At least one SpeechModuleConfiguration is required.',
@@ -606,28 +624,7 @@ SpeechAnalysisSession analyzeFileImpl(
     },
   );
 
-  final modulesJson = _encodeSpeechModulesJson(modules);
-  final modulesJsonPtr = modulesJson.toNativeUtf8();
-  final audioFilePathPtr = audioFilePath.toNativeUtf8();
-  final contextJson = _encodeAnalysisContextJson(analysisContext);
-  final contextJsonPtr = contextJson == null
-      ? nullptr
-      : contextJson.toNativeUtf8();
-
-  try {
-    nativeSessionId = _skSpeechAnalyzerAnalyzeFileAsync(
-      modulesJsonPtr,
-      audioFilePathPtr,
-      contextJsonPtr,
-      callback.nativeFunction,
-    );
-  } finally {
-    malloc.free(modulesJsonPtr);
-    malloc.free(audioFilePathPtr);
-    if (contextJsonPtr != nullptr) {
-      malloc.free(contextJsonPtr);
-    }
-  }
+  nativeSessionId = invokeNative(callback.nativeFunction);
 
   return SpeechAnalysisSession(
     id: SpeechAnalysisSessionId(nativeSessionId),
@@ -635,4 +632,91 @@ SpeechAnalysisSession analyzeFileImpl(
     finalizeAndFinish: () => doneCompleter.future,
     cancelAndFinishNow: sessionCancel,
   );
+}
+
+SpeechAnalysisSession analyzeFileImpl(
+  String audioFilePath, {
+  required List<SpeechModuleConfiguration> modules,
+  AnalysisContext? analysisContext,
+}) {
+  if (audioFilePath.isEmpty) {
+    throw const SpeechKitException(
+      'audioFilePath must be non-empty.',
+      failure: SpeechKitFailure.operationFailed,
+    );
+  }
+
+  final modulesJson = _encodeSpeechModulesJson(modules);
+  return _speechAnalysisSessionFromNative(modules, analysisContext, (
+    nativeCb,
+  ) {
+    final modulesJsonPtr = modulesJson.toNativeUtf8();
+    final audioFilePathPtr = audioFilePath.toNativeUtf8();
+    final contextJson = _encodeAnalysisContextJson(analysisContext);
+    final contextJsonPtr = contextJson == null
+        ? nullptr
+        : contextJson.toNativeUtf8();
+
+    try {
+      return _skSpeechAnalyzerAnalyzeFileAsync(
+        modulesJsonPtr,
+        audioFilePathPtr,
+        contextJsonPtr,
+        nativeCb,
+      );
+    } finally {
+      malloc.free(modulesJsonPtr);
+      malloc.free(audioFilePathPtr);
+      if (contextJsonPtr != nullptr) {
+        malloc.free(contextJsonPtr);
+      }
+    }
+  });
+}
+
+SpeechAnalysisSession analyzePcmImpl(
+  Uint8List pcmBytes, {
+  required CompatibleAudioFormat format,
+  required List<SpeechModuleConfiguration> modules,
+  AnalysisContext? analysisContext,
+}) {
+  if (pcmBytes.isEmpty) {
+    throw const SpeechKitException(
+      'pcmBytes must be non-empty.',
+      failure: SpeechKitFailure.operationFailed,
+    );
+  }
+
+  final modulesJson = _encodeSpeechModulesJson(modules);
+  final formatJson = jsonEncode(format.toJson());
+  return _speechAnalysisSessionFromNative(modules, analysisContext, (
+    nativeCb,
+  ) {
+    final modulesJsonPtr = modulesJson.toNativeUtf8();
+    final formatJsonPtr = formatJson.toNativeUtf8();
+    final contextJson = _encodeAnalysisContextJson(analysisContext);
+    final contextJsonPtr = contextJson == null
+        ? nullptr
+        : contextJson.toNativeUtf8();
+    final pcmPtr = malloc<Uint8>(pcmBytes.length);
+    pcmPtr.asTypedList(pcmBytes.length).setAll(0, pcmBytes);
+
+    try {
+      return _skSpeechAnalyzerAnalyzePcmAsync(
+        modulesJsonPtr,
+        formatJsonPtr,
+        contextJsonPtr,
+        pcmPtr,
+        pcmBytes.length,
+        nativeCb,
+      );
+    } finally {
+      malloc.free(modulesJsonPtr);
+      malloc.free(formatJsonPtr);
+      if (contextJsonPtr != nullptr) {
+        malloc.free(contextJsonPtr);
+      }
+      malloc.free(pcmPtr);
+    }
+  });
 }

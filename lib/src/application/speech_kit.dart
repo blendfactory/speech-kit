@@ -1,6 +1,8 @@
 /// @docImport 'package:speech_kit/src/domain/errors/speech_kit_exception.dart';
 library;
 
+import 'dart:typed_data';
+
 import 'package:meta/meta.dart';
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/value_objects/analysis/analysis_context.dart';
@@ -99,6 +101,29 @@ class SpeechKit {
   }) {
     return analyzeFileImpl(
       audioFilePath,
+      modules: modules,
+      analysisContext: analysisContext,
+    );
+  }
+
+  /// Starts a `SpeechAnalyzer` session from raw PCM in memory (`AnalyzerInput`
+  /// + `analyzeSequence(_:)`).
+  ///
+  /// [pcmBytes] must match [format] (frame-aligned interleaved PCM as produced
+  /// for that `AVAudioFormat`). Prefer [bestAvailableAudioFormat] for a
+  /// compatible layout.
+  ///
+  /// This passes a **single buffer** as one `AnalyzerInput`; streaming multiple
+  /// chunks is not yet exposed from Dart.
+  SpeechAnalysisSession analyzePcm(
+    Uint8List pcmBytes, {
+    required CompatibleAudioFormat format,
+    required List<SpeechModuleConfiguration> modules,
+    AnalysisContext? analysisContext,
+  }) {
+    return analyzePcmImpl(
+      pcmBytes,
+      format: format,
       modules: modules,
       analysisContext: analysisContext,
     );

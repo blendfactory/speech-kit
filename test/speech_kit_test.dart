@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 
 import 'package:speech_kit/speech_kit.dart';
 import 'package:test/test.dart';
@@ -62,6 +63,46 @@ void main() {
       expect(
         () => kit.analyzeFile(
           '',
+          modules: const [],
+        ),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
+
+      const fmt = CompatibleAudioFormat(
+        sampleRate: 48000,
+        channelCount: 1,
+        commonFormatRawValue: 1,
+        isInterleaved: true,
+      );
+      expect(
+        () => kit.analyzePcm(
+          Uint8List(0),
+          format: fmt,
+          modules: const [
+            SpeechTranscriberConfiguration(
+              localeId: 'en-US',
+              preset: SpeechTranscriberPreset.transcription,
+            ),
+          ],
+        ),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
+      expect(
+        () => kit.analyzePcm(
+          Uint8List(4),
+          format: fmt,
           modules: const [],
         ),
         throwsA(

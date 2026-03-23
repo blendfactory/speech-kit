@@ -22,6 +22,14 @@ final class CompatibleAudioFormat {
     );
   }
 
+  /// JSON shape consumed by native code (matches `fromJson` keys).
+  Map<String, Object> toJson() => <String, Object>{
+    'sampleRate': sampleRate,
+    'channelCount': channelCount,
+    'commonFormat': commonFormatRawValue,
+    'isInterleaved': isInterleaved,
+  };
+
   final double sampleRate;
   final int channelCount;
   final int commonFormatRawValue;

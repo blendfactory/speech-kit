@@ -133,6 +133,96 @@ private func analysisContextFromJsonUtf8(
 }
 
 @available(macOS 26.0, *)
+private func avAudioFormatFromCompatibleJsonString(_ str: String) throws -> AVAudioFormat {
+  guard let data = str.data(using: .utf8) else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid format utf-8"],
+    )
+  }
+  guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid format JSON"],
+    )
+  }
+  let sampleRate = obj["sampleRate"] as? Double ?? 0
+  let channelCount = obj["channelCount"] as? Int ?? 0
+  let cfRaw = UInt(obj["commonFormat"] as? Int ?? 0)
+  let interleaved = obj["isInterleaved"] as? Bool ?? true
+  guard sampleRate > 0, channelCount > 0 else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid sampleRate or channelCount"],
+    )
+  }
+  let common = AVAudioCommonFormat(rawValue: cfRaw) ?? .pcmFormatFloat32
+  guard let fmt = AVAudioFormat(
+    commonFormat: common,
+    sampleRate: sampleRate,
+    channels: AVAudioChannelCount(channelCount),
+    interleaved: interleaved
+  ) else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Could not build AVAudioFormat"],
+    )
+  }
+  return fmt
+}
+
+@available(macOS 26.0, *)
+private func avAudioPCMBuffer(pcmData: Data, format: AVAudioFormat) throws -> AVAudioPCMBuffer {
+  let bpf = Int(format.streamDescription.pointee.mBytesPerFrame)
+  guard bpf > 0 else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid bytes-per-frame in format"],
+    )
+  }
+  guard !pcmData.isEmpty else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Empty PCM data"],
+    )
+  }
+  guard pcmData.count % bpf == 0 else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "PCM length is not a multiple of frame size"],
+    )
+  }
+  let frameCount = pcmData.count / bpf
+  guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount)) else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Could not allocate AVAudioPCMBuffer"],
+    )
+  }
+  buffer.frameLength = AVAudioFrameCount(frameCount)
+  guard let dst = buffer.mutableAudioBufferList.pointee.mBuffers.mData else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "No buffer storage"],
+    )
+  }
+  pcmData.withUnsafeBytes { raw in
+    guard let src = raw.baseAddress else { return }
+    memcpy(dst, src, pcmData.count)
+  }
+  return buffer
+}
+
+@available(macOS 26.0, *)
 private func encodeStatus(_ status: AssetInventory.Status) -> Int32 {
   switch status {
   case .unsupported: return 0
@@ -468,6 +558,115 @@ private func runAnalyzerFileSession(
   }
 }
 
+@available(macOS 26.0, *)
+private func runAnalyzerPcmSession(
+  modulesJsonUtf8: UnsafePointer<CChar>?,
+  formatJsonUtf8: UnsafePointer<CChar>?,
+  analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  pcmData: Data,
+  sessionId: Int32,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) async {
+  guard let modulesJsonUtf8, let formatJsonUtf8 else {
+    callback(-1, 1, dupCString("Missing modulesJson or formatJson"))
+    return
+  }
+
+  defer {
+    _unregisterAnalyzerSession(sessionId)
+  }
+
+  let modulesStr = String(cString: modulesJsonUtf8)
+  let formatStr = String(cString: formatJsonUtf8)
+  guard let modulesData = modulesStr.data(using: .utf8) else {
+    callback(-1, 1, dupCString("Invalid utf-8 modulesJson"))
+    return
+  }
+
+  var analyzer: SpeechAnalyzer?
+  var resultsTask: Task<Void, Error>?
+  do {
+    let modules = try parseModules(data: modulesData)
+
+    var speechTranscriber: SpeechTranscriber?
+    var dictationTranscriber: DictationTranscriber?
+    for m in modules {
+      if let s = m as? SpeechTranscriber {
+        speechTranscriber = s
+        break
+      }
+      if let d = m as? DictationTranscriber {
+        dictationTranscriber = d
+        break
+      }
+    }
+    guard speechTranscriber != nil || dictationTranscriber != nil else {
+      callback(
+        -1,
+        2,
+        dupCString("No SpeechTranscriber or DictationTranscriber module in modules JSON"),
+      )
+      return
+    }
+
+    let avFormat = try avAudioFormatFromCompatibleJsonString(formatStr)
+
+    analyzer = SpeechAnalyzer(modules: modules)
+    if let ctx = try analysisContextFromJsonUtf8(analysisContextJsonUtf8) {
+      try await analyzer!.setContext(ctx)
+    }
+
+    try await analyzer!.prepareToAnalyze(
+      in: avFormat,
+      withProgressReadyHandler: nil,
+    )
+
+    if let transcriber = speechTranscriber {
+      resultsTask = Task<Void, Error> {
+        for try await r in transcriber.results {
+          if Task.isCancelled { break }
+          sendSpeechTranscriberAnalyzerResult(r, callback: callback)
+        }
+      }
+    } else if let transcriber = dictationTranscriber {
+      resultsTask = Task<Void, Error> {
+        for try await r in transcriber.results {
+          if Task.isCancelled { break }
+          sendDictationTranscriberAnalyzerResult(r, callback: callback)
+        }
+      }
+    }
+
+    let pcmBuffer = try avAudioPCMBuffer(pcmData: pcmData, format: avFormat)
+    let inputStream = AsyncStream<AnalyzerInput> { continuation in
+      continuation.yield(AnalyzerInput(buffer: pcmBuffer))
+      continuation.finish()
+    }
+
+    let lastSampleTime = try await analyzer!.analyzeSequence(inputStream)
+
+    if let lastSampleTime {
+      try await analyzer!.finalizeAndFinish(through: lastSampleTime)
+    } else {
+      await analyzer!.cancelAndFinishNow()
+    }
+
+    try await resultsTask!.value
+    callback(1, 0, nil)
+  } catch is CancellationError {
+    if let analyzer {
+      await analyzer.cancelAndFinishNow()
+    }
+    if let task = resultsTask {
+      _ = try? await task.value
+    }
+    callback(1, 0, nil)
+  } catch {
+    let ns = error as NSError
+    callback(-1, 1, dupCString(ns.localizedDescription))
+  }
+}
+
 @_cdecl("sk_speech_analyzer_analyze_file_async")
 public func sk_speech_analyzer_analyze_file_async(
   modulesJsonUtf8: UnsafePointer<CChar>?,
@@ -490,6 +689,50 @@ public func sk_speech_analyzer_analyze_file_async(
       modulesJsonUtf8: modulesJsonUtf8,
       audioFilePathUtf8: audioFilePathUtf8,
       analysisContextJsonUtf8: analysisContextJsonUtf8,
+      sessionId: sessionId,
+      callback: callback,
+    )
+  }
+
+  _analyzerSessionsLock.lock()
+  _analyzerSessions[sessionId] = task
+  _analyzerSessionsLock.unlock()
+
+  return sessionId
+}
+
+@_cdecl("sk_speech_analyzer_analyze_pcm_async")
+public func sk_speech_analyzer_analyze_pcm_async(
+  modulesJsonUtf8: UnsafePointer<CChar>?,
+  formatJsonUtf8: UnsafePointer<CChar>?,
+  analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  pcmBytes: UnsafePointer<UInt8>?,
+  pcmByteLength: Int64,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) -> Int32 {
+  if #unavailable(macOS 26.0) {
+    callback(-1, 4, dupCString("SpeechAnalyzer requires macOS 26"))
+    return -1
+  }
+
+  let pcmData: Data
+  if pcmByteLength > 0, let pcmBytes {
+    pcmData = Data(bytes: pcmBytes, count: Int(pcmByteLength))
+  } else {
+    pcmData = Data()
+  }
+
+  _analyzerSessionsLock.lock()
+  let sessionId = _nextAnalyzerSessionId
+  _nextAnalyzerSessionId &+= 1
+  _analyzerSessionsLock.unlock()
+
+  let task = Task {
+    await runAnalyzerPcmSession(
+      modulesJsonUtf8: modulesJsonUtf8,
+      formatJsonUtf8: formatJsonUtf8,
+      analysisContextJsonUtf8: analysisContextJsonUtf8,
+      pcmData: pcmData,
       sessionId: sessionId,
       callback: callback,
     )
