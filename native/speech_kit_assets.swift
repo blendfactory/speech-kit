@@ -284,8 +284,11 @@ public func sk_speech_best_available_audio_format_async(
 // MARK: - SpeechAnalyzer (file-based) session streaming
 
 private let _analyzerSessionsLock = NSLock()
-private var _nextAnalyzerSessionId: Int32 = 1
-private var _analyzerSessions: [Int32: Task<Void, Never>] = [:]
+// Swift 6: `MutableGlobalVariable` — opt out explicitly; all reads/writes are
+// serialized by `_analyzerSessionsLock` in the C entry points and
+// `_unregisterAnalyzerSession`.
+nonisolated(unsafe) private var _nextAnalyzerSessionId: Int32 = 1
+nonisolated(unsafe) private var _analyzerSessions: [Int32: Task<Void, Never>] = [:]
 
 /// Removes a session entry from the global map. Must use `NSLock` only from
 /// synchronous call sites so Swift 6 does not treat `lock()` as crossing an
