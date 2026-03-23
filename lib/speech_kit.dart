@@ -15,6 +15,7 @@ export 'src/domain/value_objects/configuration/speech_detector_sensitivity.dart'
 export 'src/domain/value_objects/configuration/speech_language_model_paths.dart';
 export 'src/domain/value_objects/configuration/speech_module_configuration.dart';
 export 'src/domain/value_objects/configuration/speech_transcriber_preset.dart';
+export 'src/domain/value_objects/configuration/template_language_model_training.dart';
 export 'src/domain/value_objects/identifiers/speech_analysis_session_id.dart';
 export 'src/domain/value_objects/permissions/microphone_permission.dart';
 export 'src/domain/value_objects/permissions/speech_recognition_permission.dart';

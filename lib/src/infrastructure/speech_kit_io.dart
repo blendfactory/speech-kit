@@ -13,6 +13,7 @@ import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_forma
 import 'package:speech_kit/src/domain/value_objects/configuration/custom_language_model_export.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_analyzer_options.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
+import 'package:speech_kit/src/domain/value_objects/configuration/template_language_model_training.dart';
 import 'package:speech_kit/src/domain/value_objects/identifiers/speech_analysis_session_id.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/speech_recognition_permission.dart';
@@ -749,6 +750,18 @@ Future<void> exportCustomLanguageModelDataImpl(
       return Future.error(
         const SpeechKitException(
           'phraseCounts entries must use a non-negative count.',
+          failure: SpeechKitFailure.operationFailed,
+        ),
+      );
+    }
+  }
+  final templates = request.phraseCountsFromTemplates;
+  if (templates != null) {
+    final templateErr = phraseCountsFromTemplatesValidationError(templates);
+    if (templateErr != null) {
+      return Future.error(
+        SpeechKitException(
+          templateErr,
           failure: SpeechKitFailure.operationFailed,
         ),
       );

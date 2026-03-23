@@ -89,7 +89,145 @@ private func buildSFCustomLanguageModelData(from root: [String: Any]) throws -> 
       )
     }
   }
+  if let pctAny = root["phraseCountsFromTemplates"] {
+    guard let pctDict = pctAny as? [String: Any] else {
+      throw NSError(
+        domain: "speech_kit",
+        code: 3,
+        userInfo: [NSLocalizedDescriptionKey: "phraseCountsFromTemplates must be an object"],
+      )
+    }
+    let classes = try skPhraseCountsClassesFromJson(pctDict["classes"])
+    guard let rootNode = pctDict["root"] as? [String: Any] else {
+      throw NSError(
+        domain: "speech_kit",
+        code: 3,
+        userInfo: [NSLocalizedDescriptionKey: "phraseCountsFromTemplates.root is required"],
+      )
+    }
+    let classNames = Set(classes.keys)
+    let built = try skBuildTemplateInsertable(
+      from: rootNode,
+      classNames: classNames,
+      depth: 0,
+    )
+    let pct = SFCustomLanguageModelData.PhraseCountsFromTemplates(classes: classes) {
+      built
+    }
+    pct.insert(data: model)
+  }
   return model
+}
+
+/// Replaces `{className}` with `<className>` for keys in [classNames] (Apple template syntax).
+@available(macOS 26.0, *)
+private func skNormalizeBracedPlaceholdersForTemplate(
+  _ body: String,
+  classNames: Set<String>,
+) -> String {
+  var out = body
+  for name in classNames {
+    out = out.replacingOccurrences(of: "{\(name)}", with: "<\(name)>")
+  }
+  return out
+}
+
+@available(macOS 26.0, *)
+private func skPhraseCountsClassesFromJson(_ any: Any?) throws -> [String: [String]] {
+  guard let dict = any as? [String: Any] else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 3,
+      userInfo: [NSLocalizedDescriptionKey: "phraseCountsFromTemplates.classes must be an object"],
+    )
+  }
+  var out: [String: [String]] = [:]
+  for (key, value) in dict {
+    if let arr = value as? [String] {
+      out[key] = arr
+    } else if let arr = value as? [Any] {
+      let strings = arr.compactMap { $0 as? String }
+      if strings.count != arr.count {
+        throw NSError(
+          domain: "speech_kit",
+          code: 3,
+          userInfo: [
+            NSLocalizedDescriptionKey:
+              "phraseCountsFromTemplates.classes values must be string arrays",
+          ],
+        )
+      }
+      out[key] = strings
+    } else {
+      throw NSError(
+        domain: "speech_kit",
+        code: 3,
+        userInfo: [
+          NSLocalizedDescriptionKey:
+            "phraseCountsFromTemplates.classes values must be string arrays",
+        ],
+      )
+    }
+  }
+  return out
+}
+
+@available(macOS 26.0, *)
+private func skBuildTemplateInsertable(
+  from dict: [String: Any],
+  classNames: Set<String>,
+  depth: Int,
+) throws -> any TemplateInsertable {
+  guard depth <= 32 else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 3,
+      userInfo: [NSLocalizedDescriptionKey: "template tree exceeds max depth"],
+    )
+  }
+  let kind = dict["kind"] as? String ?? ""
+  switch kind {
+  case "template":
+    let body = dict["body"] as? String ?? ""
+    let count = dict["count"] as? Int ?? 0
+    if count < 0 {
+      throw NSError(
+        domain: "speech_kit",
+        code: 3,
+        userInfo: [NSLocalizedDescriptionKey: "template count must be non-negative"],
+      )
+    }
+    let normalized = skNormalizeBracedPlaceholdersForTemplate(body, classNames: classNames)
+    return SFCustomLanguageModelData.TemplatePhraseCountGenerator.Template(normalized, count: count)
+  case "compound":
+    let raw = dict["components"] as? [[String: Any]] ?? []
+    if raw.isEmpty {
+      throw NSError(
+        domain: "speech_kit",
+        code: 3,
+        userInfo: [
+          NSLocalizedDescriptionKey: "compound template must have at least one component",
+        ],
+      )
+    }
+    var parts: [any TemplateInsertable] = []
+    for item in raw {
+      parts.append(
+        try skBuildTemplateInsertable(
+          from: item,
+          classNames: classNames,
+          depth: depth + 1,
+        ),
+      )
+    }
+    return SFCustomLanguageModelData.CompoundTemplate(parts)
+  default:
+    throw NSError(
+      domain: "speech_kit",
+      code: 3,
+      userInfo: [NSLocalizedDescriptionKey: "invalid phraseCountsFromTemplates node kind"],
+    )
+  }
 }
 
 @available(macOS 26.0, *)
