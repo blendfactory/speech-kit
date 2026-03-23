@@ -8,6 +8,7 @@ import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/value_objects/analysis/analysis_context.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
+import 'package:speech_kit/src/domain/value_objects/configuration/speech_analyzer_options.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/speech_recognition_permission.dart';
@@ -95,6 +96,9 @@ class SpeechKit {
   ///   `prepareToAnalyze(in:withProgressReadyHandler:)` (expected input format
   ///   and `Progress.fractionCompleted`). If [prepareAudioFormat] is null, the
   ///   file’s `processingFormat` is used for preparation.
+  /// - Optional [analyzerOptions] maps to `SpeechAnalyzer.Options` (task
+  ///   priority and model retention). If null, the system default options are
+  ///   used.
   /// - Call [SpeechAnalysisSession.finalizeAndFinish] or
   ///   [SpeechAnalysisSession.cancelAndFinishNow] to end the native session
   ///   explicitly when needed.
@@ -102,6 +106,7 @@ class SpeechKit {
     String audioFilePath, {
     required List<SpeechModuleConfiguration> modules,
     AnalysisContext? analysisContext,
+    SpeechAnalyzerOptions? analyzerOptions,
     CompatibleAudioFormat? prepareAudioFormat,
     void Function(double fractionCompleted)? onPrepareProgress,
   }) {
@@ -109,6 +114,7 @@ class SpeechKit {
       audioFilePath,
       modules: modules,
       analysisContext: analysisContext,
+      analyzerOptions: analyzerOptions,
       prepareAudioFormat: prepareAudioFormat,
       onPrepareProgress: onPrepareProgress,
     );
@@ -127,11 +133,14 @@ class SpeechKit {
   /// [prepareAudioFormat] / [onPrepareProgress] follow the same rules as
   /// [analyzeFile] (`prepareToAnalyze`). If [prepareAudioFormat] is null,
   /// [format] is used for preparation.
+  ///
+  /// [analyzerOptions] is the same as for [analyzeFile].
   SpeechAnalysisSession analyzePcm(
     Uint8List pcmBytes, {
     required CompatibleAudioFormat format,
     required List<SpeechModuleConfiguration> modules,
     AnalysisContext? analysisContext,
+    SpeechAnalyzerOptions? analyzerOptions,
     CompatibleAudioFormat? prepareAudioFormat,
     void Function(double fractionCompleted)? onPrepareProgress,
   }) {
@@ -140,6 +149,7 @@ class SpeechKit {
       format: format,
       modules: modules,
       analysisContext: analysisContext,
+      analyzerOptions: analyzerOptions,
       prepareAudioFormat: prepareAudioFormat,
       onPrepareProgress: onPrepareProgress,
     );
@@ -157,11 +167,14 @@ class SpeechKit {
   ///
   /// [prepareAudioFormat] / [onPrepareProgress] follow the same rules as
   /// [analyzePcm]. PCM payloads still use [format] for buffer layout.
+  ///
+  /// [analyzerOptions] is the same as for [analyzeFile].
   SpeechAnalysisSession analyzePcmStream(
     Stream<Uint8List> pcmChunks, {
     required CompatibleAudioFormat format,
     required List<SpeechModuleConfiguration> modules,
     AnalysisContext? analysisContext,
+    SpeechAnalyzerOptions? analyzerOptions,
     CompatibleAudioFormat? prepareAudioFormat,
     void Function(double fractionCompleted)? onPrepareProgress,
   }) {
@@ -170,6 +183,7 @@ class SpeechKit {
       format: format,
       modules: modules,
       analysisContext: analysisContext,
+      analyzerOptions: analyzerOptions,
       prepareAudioFormat: prepareAudioFormat,
       onPrepareProgress: onPrepareProgress,
     );

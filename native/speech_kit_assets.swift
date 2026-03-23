@@ -132,6 +132,68 @@ private func analysisContextFromJsonUtf8(
   return ctx
 }
 
+/// Maps JSON from Dart (`taskPriority`, `modelRetention`) to `SpeechAnalyzer.Options`.
+@available(macOS 26.0, *)
+private func speechAnalyzerOptionsFromJsonUtf8(
+  _ utf8: UnsafePointer<CChar>?,
+) throws -> SpeechAnalyzer.Options? {
+  guard let utf8 else { return nil }
+  let str = String(cString: utf8)
+  if str.isEmpty { return nil }
+  guard let data = str.data(using: .utf8) else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid utf-8 analyzer options JSON"],
+    )
+  }
+  guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid analyzer options JSON root"],
+    )
+  }
+  let priorityStr = (root["taskPriority"] as? String) ?? "medium"
+  let retentionStr = (root["modelRetention"] as? String) ?? "whileInUse"
+
+  let priority: TaskPriority
+  switch priorityStr.lowercased() {
+  case "high":
+    priority = .high
+  case "medium":
+    priority = .medium
+  case "low":
+    priority = .low
+  case "background":
+    priority = .background
+  default:
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid taskPriority: \(priorityStr)"],
+    )
+  }
+
+  let retention: SpeechAnalyzer.Options.ModelRetention
+  switch retentionStr.lowercased() {
+  case "whileinuse":
+    retention = .whileInUse
+  case "lingering":
+    retention = .lingering
+  case "processlifetime":
+    retention = .processLifetime
+  default:
+    throw NSError(
+      domain: "speech_kit",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Invalid modelRetention: \(retentionStr)"],
+    )
+  }
+
+  return SpeechAnalyzer.Options(priority: priority, modelRetention: retention)
+}
+
 @available(macOS 26.0, *)
 private func avAudioFormatFromCompatibleJsonString(_ str: String) throws -> AVAudioFormat {
   guard let data = str.data(using: .utf8) else {
@@ -564,6 +626,7 @@ private func runAnalyzerFileSession(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   audioFilePathUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  analyzerOptionsJsonUtf8: UnsafePointer<CChar>?,
   prepareFormatJson: String?,
   reportPrepareProgress: Bool,
   sessionId: Int32,
@@ -611,7 +674,12 @@ private func runAnalyzerFileSession(
       return
     }
 
-    analyzer = SpeechAnalyzer(modules: modules)
+    let analyzerOpts = try speechAnalyzerOptionsFromJsonUtf8(analyzerOptionsJsonUtf8)
+    if let analyzerOpts {
+      analyzer = SpeechAnalyzer(modules: modules, options: analyzerOpts)
+    } else {
+      analyzer = SpeechAnalyzer(modules: modules)
+    }
     if let ctx = try analysisContextFromJsonUtf8(analysisContextJsonUtf8) {
       try await analyzer!.setContext(ctx)
     }
@@ -682,6 +750,7 @@ private func runAnalyzerPcmSession(
   formatJsonUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
   pcmData: Data,
+  analyzerOptionsJsonUtf8: UnsafePointer<CChar>?,
   prepareFormatJson: String?,
   reportPrepareProgress: Bool,
   sessionId: Int32,
@@ -738,7 +807,12 @@ private func runAnalyzerPcmSession(
       effectivePrepareFormat = avFormat
     }
 
-    analyzer = SpeechAnalyzer(modules: modules)
+    let analyzerOpts = try speechAnalyzerOptionsFromJsonUtf8(analyzerOptionsJsonUtf8)
+    if let analyzerOpts {
+      analyzer = SpeechAnalyzer(modules: modules, options: analyzerOpts)
+    } else {
+      analyzer = SpeechAnalyzer(modules: modules)
+    }
     if let ctx = try analysisContextFromJsonUtf8(analysisContextJsonUtf8) {
       try await analyzer!.setContext(ctx)
     }
@@ -801,6 +875,7 @@ private func runAnalyzerPcmStreamSession(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   formatJsonUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  analyzerOptionsJsonUtf8: UnsafePointer<CChar>?,
   prepareFormatJson: String?,
   reportPrepareProgress: Bool,
   sessionId: Int32,
@@ -858,7 +933,12 @@ private func runAnalyzerPcmStreamSession(
       effectivePrepareFormat = avFormat
     }
 
-    analyzer = SpeechAnalyzer(modules: modules)
+    let analyzerOpts = try speechAnalyzerOptionsFromJsonUtf8(analyzerOptionsJsonUtf8)
+    if let analyzerOpts {
+      analyzer = SpeechAnalyzer(modules: modules, options: analyzerOpts)
+    } else {
+      analyzer = SpeechAnalyzer(modules: modules)
+    }
     if let ctx = try analysisContextFromJsonUtf8(analysisContextJsonUtf8) {
       try await analyzer!.setContext(ctx)
     }
@@ -921,6 +1001,7 @@ public func sk_speech_analyzer_analyze_file_async(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   audioFilePathUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  analyzerOptionsJsonUtf8: UnsafePointer<CChar>?,
   prepareFormatJsonUtf8: UnsafePointer<CChar>?,
   prepareProgressEnabled: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
@@ -949,6 +1030,7 @@ public func sk_speech_analyzer_analyze_file_async(
       modulesJsonUtf8: modulesJsonUtf8,
       audioFilePathUtf8: audioFilePathUtf8,
       analysisContextJsonUtf8: analysisContextJsonUtf8,
+      analyzerOptionsJsonUtf8: analyzerOptionsJsonUtf8,
       prepareFormatJson: prepareFormatStr,
       reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
@@ -970,6 +1052,7 @@ public func sk_speech_analyzer_analyze_pcm_async(
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
   pcmBytes: UnsafePointer<UInt8>?,
   pcmByteLength: Int64,
+  analyzerOptionsJsonUtf8: UnsafePointer<CChar>?,
   prepareFormatJsonUtf8: UnsafePointer<CChar>?,
   prepareProgressEnabled: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
@@ -1006,6 +1089,7 @@ public func sk_speech_analyzer_analyze_pcm_async(
       formatJsonUtf8: formatJsonUtf8,
       analysisContextJsonUtf8: analysisContextJsonUtf8,
       pcmData: pcmData,
+      analyzerOptionsJsonUtf8: analyzerOptionsJsonUtf8,
       prepareFormatJson: prepareFormatStr,
       reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
@@ -1025,6 +1109,7 @@ public func sk_speech_analyzer_start_pcm_stream_async(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   formatJsonUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  analyzerOptionsJsonUtf8: UnsafePointer<CChar>?,
   prepareFormatJsonUtf8: UnsafePointer<CChar>?,
   prepareProgressEnabled: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
@@ -1053,6 +1138,7 @@ public func sk_speech_analyzer_start_pcm_stream_async(
       modulesJsonUtf8: modulesJsonUtf8,
       formatJsonUtf8: formatJsonUtf8,
       analysisContextJsonUtf8: analysisContextJsonUtf8,
+      analyzerOptionsJsonUtf8: analyzerOptionsJsonUtf8,
       prepareFormatJson: prepareFormatStr,
       reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,

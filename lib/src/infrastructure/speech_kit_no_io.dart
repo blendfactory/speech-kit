@@ -5,6 +5,7 @@ import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/value_objects/analysis/analysis_context.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
+import 'package:speech_kit/src/domain/value_objects/configuration/speech_analyzer_options.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/speech_recognition_permission.dart';
@@ -52,6 +53,7 @@ SpeechAnalysisSession analyzeFileImpl(
   String audioFilePath, {
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  SpeechAnalyzerOptions? analyzerOptions,
   CompatibleAudioFormat? prepareAudioFormat,
   void Function(double fractionCompleted)? onPrepareProgress,
 }) {
@@ -63,6 +65,7 @@ SpeechAnalysisSession analyzePcmImpl(
   required CompatibleAudioFormat format,
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  SpeechAnalyzerOptions? analyzerOptions,
   CompatibleAudioFormat? prepareAudioFormat,
   void Function(double fractionCompleted)? onPrepareProgress,
 }) {
@@ -74,6 +77,7 @@ SpeechAnalysisSession analyzePcmStreamImpl(
   required CompatibleAudioFormat format,
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  SpeechAnalyzerOptions? analyzerOptions,
   CompatibleAudioFormat? prepareAudioFormat,
   void Function(double fractionCompleted)? onPrepareProgress,
 }) {

@@ -10,6 +10,7 @@ import 'package:speech_kit/src/domain/errors/speech_kit_exception.dart';
 import 'package:speech_kit/src/domain/value_objects/analysis/analysis_context.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
+import 'package:speech_kit/src/domain/value_objects/configuration/speech_analyzer_options.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/identifiers/speech_analysis_session_id.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
@@ -121,6 +122,7 @@ typedef SkSpeechAnalyzerEventCallbackNative =
     Pointer<Utf8>,
     Pointer<Utf8>,
     Pointer<Utf8>,
+    Pointer<Utf8>,
     Int32,
     Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>>,
   )
@@ -132,6 +134,7 @@ external int _skSpeechAnalyzerAnalyzeFileAsync(
   Pointer<Utf8> modulesJsonUtf8,
   Pointer<Utf8> audioFilePathUtf8,
   Pointer<Utf8> analysisContextJsonUtf8,
+  Pointer<Utf8> analyzerOptionsJsonUtf8,
   Pointer<Utf8> prepareFormatJsonUtf8,
   int prepareProgressEnabled,
   Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>> callback,
@@ -144,6 +147,7 @@ external int _skSpeechAnalyzerAnalyzeFileAsync(
     Pointer<Utf8>,
     Pointer<Uint8>,
     Int64,
+    Pointer<Utf8>,
     Pointer<Utf8>,
     Int32,
     Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>>,
@@ -158,6 +162,7 @@ external int _skSpeechAnalyzerAnalyzePcmAsync(
   Pointer<Utf8> analysisContextJsonUtf8,
   Pointer<Uint8> pcmBytes,
   int pcmByteLength,
+  Pointer<Utf8> analyzerOptionsJsonUtf8,
   Pointer<Utf8> prepareFormatJsonUtf8,
   int prepareProgressEnabled,
   Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>> callback,
@@ -165,6 +170,7 @@ external int _skSpeechAnalyzerAnalyzePcmAsync(
 
 @Native<
   Int32 Function(
+    Pointer<Utf8>,
     Pointer<Utf8>,
     Pointer<Utf8>,
     Pointer<Utf8>,
@@ -180,6 +186,7 @@ external int _skSpeechAnalyzerStartPcmStreamAsync(
   Pointer<Utf8> modulesJsonUtf8,
   Pointer<Utf8> formatJsonUtf8,
   Pointer<Utf8> analysisContextJsonUtf8,
+  Pointer<Utf8> analyzerOptionsJsonUtf8,
   Pointer<Utf8> prepareFormatJsonUtf8,
   int prepareProgressEnabled,
   Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>> callback,
@@ -292,6 +299,13 @@ String? _encodeAnalysisContextJson(AnalysisContext? context) {
   return jsonEncode(<String, Object>{
     'contextualStrings': context.contextualStringsByTag,
   });
+}
+
+String? _encodeAnalyzerOptionsJson(SpeechAnalyzerOptions? options) {
+  if (options == null) {
+    return null;
+  }
+  return jsonEncode(options.toJson());
 }
 
 String _encodeSpeechModulesJson(List<SpeechModuleConfiguration> modules) {
@@ -755,6 +769,7 @@ SpeechAnalysisSession analyzeFileImpl(
   String audioFilePath, {
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  SpeechAnalyzerOptions? analyzerOptions,
   CompatibleAudioFormat? prepareAudioFormat,
   void Function(double fractionCompleted)? onPrepareProgress,
 }) {
@@ -769,6 +784,7 @@ SpeechAnalysisSession analyzeFileImpl(
   final prepareJson = prepareAudioFormat == null
       ? null
       : jsonEncode(prepareAudioFormat.toJson());
+  final analyzerOptsJson = _encodeAnalyzerOptionsJson(analyzerOptions);
   return _speechAnalysisSessionFromNative(
     modules,
     analysisContext,
@@ -779,6 +795,9 @@ SpeechAnalysisSession analyzeFileImpl(
       final contextJsonPtr = contextJson == null
           ? nullptr
           : contextJson.toNativeUtf8();
+      final analyzerOptsPtr = analyzerOptsJson == null
+          ? nullptr
+          : analyzerOptsJson.toNativeUtf8();
       final preparePtr = prepareJson == null
           ? nullptr
           : prepareJson.toNativeUtf8();
@@ -788,6 +807,7 @@ SpeechAnalysisSession analyzeFileImpl(
           modulesJsonPtr,
           audioFilePathPtr,
           contextJsonPtr,
+          analyzerOptsPtr,
           preparePtr,
           onPrepareProgress != null ? 1 : 0,
           nativeCb,
@@ -797,6 +817,9 @@ SpeechAnalysisSession analyzeFileImpl(
         malloc.free(audioFilePathPtr);
         if (contextJsonPtr != nullptr) {
           malloc.free(contextJsonPtr);
+        }
+        if (analyzerOptsPtr != nullptr) {
+          malloc.free(analyzerOptsPtr);
         }
         if (preparePtr != nullptr) {
           malloc.free(preparePtr);
@@ -812,6 +835,7 @@ SpeechAnalysisSession analyzePcmImpl(
   required CompatibleAudioFormat format,
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  SpeechAnalyzerOptions? analyzerOptions,
   CompatibleAudioFormat? prepareAudioFormat,
   void Function(double fractionCompleted)? onPrepareProgress,
 }) {
@@ -827,6 +851,7 @@ SpeechAnalysisSession analyzePcmImpl(
   final prepareJson = prepareAudioFormat == null
       ? null
       : jsonEncode(prepareAudioFormat.toJson());
+  final analyzerOptsJson = _encodeAnalyzerOptionsJson(analyzerOptions);
   return _speechAnalysisSessionFromNative(
     modules,
     analysisContext,
@@ -837,6 +862,9 @@ SpeechAnalysisSession analyzePcmImpl(
       final contextJsonPtr = contextJson == null
           ? nullptr
           : contextJson.toNativeUtf8();
+      final analyzerOptsPtr = analyzerOptsJson == null
+          ? nullptr
+          : analyzerOptsJson.toNativeUtf8();
       final preparePtr = prepareJson == null
           ? nullptr
           : prepareJson.toNativeUtf8();
@@ -850,6 +878,7 @@ SpeechAnalysisSession analyzePcmImpl(
           contextJsonPtr,
           pcmPtr,
           pcmBytes.length,
+          analyzerOptsPtr,
           preparePtr,
           onPrepareProgress != null ? 1 : 0,
           nativeCb,
@@ -859,6 +888,9 @@ SpeechAnalysisSession analyzePcmImpl(
         malloc.free(formatJsonPtr);
         if (contextJsonPtr != nullptr) {
           malloc.free(contextJsonPtr);
+        }
+        if (analyzerOptsPtr != nullptr) {
+          malloc.free(analyzerOptsPtr);
         }
         if (preparePtr != nullptr) {
           malloc.free(preparePtr);
@@ -875,6 +907,7 @@ SpeechAnalysisSession analyzePcmStreamImpl(
   required CompatibleAudioFormat format,
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  SpeechAnalyzerOptions? analyzerOptions,
   CompatibleAudioFormat? prepareAudioFormat,
   void Function(double fractionCompleted)? onPrepareProgress,
 }) {
@@ -883,6 +916,7 @@ SpeechAnalysisSession analyzePcmStreamImpl(
   final prepareJson = prepareAudioFormat == null
       ? null
       : jsonEncode(prepareAudioFormat.toJson());
+  final analyzerOptsJson = _encodeAnalyzerOptionsJson(analyzerOptions);
   final pcmStreamCancelFlag = <bool>[false];
 
   return _speechAnalysisSessionFromNative(
@@ -895,6 +929,9 @@ SpeechAnalysisSession analyzePcmStreamImpl(
       final contextJsonPtr = contextJson == null
           ? nullptr
           : contextJson.toNativeUtf8();
+      final analyzerOptsPtr = analyzerOptsJson == null
+          ? nullptr
+          : analyzerOptsJson.toNativeUtf8();
       final preparePtr = prepareJson == null
           ? nullptr
           : prepareJson.toNativeUtf8();
@@ -904,6 +941,7 @@ SpeechAnalysisSession analyzePcmStreamImpl(
           modulesJsonPtr,
           formatJsonPtr,
           contextJsonPtr,
+          analyzerOptsPtr,
           preparePtr,
           onPrepareProgress != null ? 1 : 0,
           nativeCb,
@@ -913,6 +951,9 @@ SpeechAnalysisSession analyzePcmStreamImpl(
         malloc.free(formatJsonPtr);
         if (contextJsonPtr != nullptr) {
           malloc.free(contextJsonPtr);
+        }
+        if (analyzerOptsPtr != nullptr) {
+          malloc.free(analyzerOptsPtr);
         }
         if (preparePtr != nullptr) {
           malloc.free(preparePtr);

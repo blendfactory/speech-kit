@@ -59,7 +59,7 @@ Update rows as implementation progresses.
 | `analyzeSequence(_:)` or `start(inputSequence:)` | ✅ | File-based `analyzeSequence(from:)` supported. |
 | Result consumption (`SpeechTranscriber.results` / `AsyncSequence`) | ✅ | Swift drains `transcriber.results` and forwards each phrase to Dart `Stream<TranscriptionSegment>`. |
 | Finish / cancel (`finalizeAndFinish`, `cancelAndFinishNow`, …) | ✅ | Uses `finalizeAndFinish(through:)` or `cancelAndFinishNow()` depending on input. Stream cancel maps to native cancel. |
-| `prepareToAnalyze`, model retention / priority options | 🚧 | **SDK (MacOSX 26.2):** `prepareToAnalyze` is public on `SpeechAnalyzer` (with and without `Progress` handler). **`SpeechAnalyzer.Options`** is public: `init(priority: TaskPriority, modelRetention:)` where `modelRetention` is `whileInUse` \| `lingering` \| `processLifetime`; **`SpeechModels.endRetention()`** exists (async). **Package:** `prepareAudioFormat` + `onPrepareProgress` bridged; **`Options` not bridged** — native uses `SpeechAnalyzer(modules:)` only (default `options: nil`). |
+| `prepareToAnalyze`, model retention / priority options | ✅ | **`prepareToAnalyze`:** optional `prepareAudioFormat` + `onPrepareProgress` on `analyzeFile` / `analyzePcm` / `analyzePcmStream`. **`SpeechAnalyzer.Options`:** Dart `SpeechAnalyzerOptions` (`taskPriority` + `modelRetention`) → JSON → `SpeechAnalyzer(modules:options:)`. **`SpeechModels.endRetention()`** not bridged (callers can add if needed). |
 
 ### Custom language model (optional)
 

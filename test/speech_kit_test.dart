@@ -10,6 +10,17 @@ void main() {
     expect(kit, isA<SpeechKit>());
   });
 
+  test('SpeechAnalyzerOptions maps to bridge JSON keys', () {
+    const o = SpeechAnalyzerOptions(
+      taskPriority: SpeechAnalyzerTaskPriority.low,
+      modelRetention: SpeechAnalyzerModelRetention.lingering,
+    );
+    expect(o.toJson(), {
+      'taskPriority': 'low',
+      'modelRetention': 'lingering',
+    });
+  });
+
   test('asset and platform guard behavior', () async {
     const kit = SpeechKit();
     if (Platform.isMacOS) {
