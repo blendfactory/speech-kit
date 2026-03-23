@@ -53,6 +53,46 @@ private func speechLanguageModelConfigurationFromPathsDict(
 }
 
 @available(macOS 26.0, *)
+private func buildSFCustomLanguageModelData(from root: [String: Any]) throws -> SFCustomLanguageModelData {
+  let localeId = root["locale"] as? String ?? ""
+  let identifier = root["identifier"] as? String ?? ""
+  let version = root["version"] as? String ?? ""
+  guard !localeId.isEmpty, !identifier.isEmpty, !version.isEmpty else {
+    throw NSError(
+      domain: "speech_kit",
+      code: 3,
+      userInfo: [NSLocalizedDescriptionKey: "locale, identifier, and version are required"],
+    )
+  }
+  let locale = Locale(identifier: localeId)
+  let model = SFCustomLanguageModelData(locale: locale, identifier: identifier, version: version)
+  if let phrases = root["phraseCounts"] as? [[String: Any]] {
+    for p in phrases {
+      let phrase = p["phrase"] as? String ?? ""
+      let count = p["count"] as? Int ?? 0
+      if count < 0 {
+        throw NSError(
+          domain: "speech_kit",
+          code: 3,
+          userInfo: [NSLocalizedDescriptionKey: "phrase count must be non-negative"],
+        )
+      }
+      model.insert(phraseCount: SFCustomLanguageModelData.PhraseCount(phrase: phrase, count: count))
+    }
+  }
+  if let terms = root["customPronunciations"] as? [[String: Any]] {
+    for t in terms {
+      let g = t["grapheme"] as? String ?? ""
+      let phonemes = t["phonemes"] as? [String] ?? []
+      model.insert(
+        term: SFCustomLanguageModelData.CustomPronunciation(grapheme: g, phonemes: phonemes),
+      )
+    }
+  }
+  return model
+}
+
+@available(macOS 26.0, *)
 private func parseModules(data: Data) throws -> [any SpeechModule] {
   guard let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
     throw NSError(
@@ -1331,6 +1371,51 @@ public func sk_speech_prepare_custom_language_model_async(
       callback(-1, 1, dupCString(error.localizedDescription))
     } else {
       callback(0, 0, nil)
+    }
+  }
+}
+
+@_cdecl("sk_speech_export_custom_language_model_data_async")
+public func sk_speech_export_custom_language_model_data_async(
+  jsonUtf8: UnsafePointer<CChar>?,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) {
+  if #unavailable(macOS 26.0) {
+    callback(-1, 4, dupCString("SFCustomLanguageModelData requires macOS 26"))
+    return
+  }
+  guard let jsonUtf8 else {
+    callback(-1, 1, dupCString("Missing JSON"))
+    return
+  }
+  let str = String(cString: jsonUtf8)
+  guard let data = str.data(using: .utf8),
+        let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+  else {
+    callback(-1, 1, dupCString("Invalid exportCustomLanguageModelData JSON"))
+    return
+  }
+  let exportPath = root["exportPath"] as? String ?? ""
+  guard !exportPath.isEmpty else {
+    callback(-1, 1, dupCString("exportPath is required"))
+    return
+  }
+  let model: SFCustomLanguageModelData
+  do {
+    model = try buildSFCustomLanguageModelData(from: root)
+  } catch {
+    let ns = error as NSError
+    callback(-1, 1, dupCString(ns.localizedDescription))
+    return
+  }
+  let exportURL = URL(fileURLWithPath: exportPath)
+  Task {
+    do {
+      try await model.export(to: exportURL)
+      callback(0, 0, nil)
+    } catch {
+      let ns = error as NSError
+      callback(-1, 1, dupCString(ns.localizedDescription))
     }
   }
 }

@@ -4,9 +4,8 @@ import 'package:speech_kit/src/application/speech_kit.dart' show SpeechKit;
 
 /// Paths to **compiled** custom language model assets for dictation.
 ///
-/// Typically produced by [SpeechKit.prepareCustomLanguageModel] (Apple
-/// `SFSpeechLanguageModel.prepareCustomLanguageModelForUrl`) from training
-/// data exported with `SFCustomLanguageModelData.export(to:)`.
+/// Typically produced by [SpeechKit.prepareCustomLanguageModel] from training
+/// data written with [SpeechKit.exportCustomLanguageModelData].
 ///
 /// Maps to `SFSpeechLanguageModel.Configuration` for
 /// `DictationTranscriber.ContentHint.customizedLanguage`.

@@ -10,6 +10,27 @@ void main() {
     expect(kit, isA<SpeechKit>());
   });
 
+  test('CustomLanguageModelExportRequest maps to bridge JSON keys', () {
+    const r = CustomLanguageModelExportRequest(
+      localeId: 'en-US',
+      identifier: 'com.example.test',
+      version: '1',
+      exportPath: '/tmp/out',
+      phraseCounts: [
+        CustomLanguageModelPhraseCount(phrase: 'hello', count: 3),
+      ],
+      pronunciations: [
+        CustomLanguageModelPronunciation(
+          grapheme: 'Foo',
+          phonemes: ['F', 'UW'],
+        ),
+      ],
+    );
+    expect(r.toJson()['locale'], 'en-US');
+    expect(r.toJson()['phraseCounts'], isA<List<Object?>>());
+    expect(r.toJson()['customPronunciations'], isA<List<Object?>>());
+  });
+
   test('SpeechLanguageModelPaths maps to bridge JSON keys', () {
     const o = SpeechLanguageModelPaths(
       languageModelPath: '/tmp/model',
@@ -103,6 +124,24 @@ void main() {
           trainingDataAssetPath: '/tmp/in',
           outputLanguageModelPath: '/tmp/out',
           weight: 2,
+        ),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
+
+      await expectLater(
+        kit.exportCustomLanguageModelData(
+          const CustomLanguageModelExportRequest(
+            localeId: '',
+            identifier: 'x',
+            version: '1',
+            exportPath: '/tmp/out',
+          ),
         ),
         throwsA(
           predicate(

@@ -10,6 +10,7 @@ import 'package:speech_kit/src/domain/errors/speech_kit_exception.dart';
 import 'package:speech_kit/src/domain/value_objects/analysis/analysis_context.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
 import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
+import 'package:speech_kit/src/domain/value_objects/configuration/custom_language_model_export.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_analyzer_options.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/identifiers/speech_analysis_session_id.dart';
@@ -131,6 +132,20 @@ external void _skSpeechModelsEndRetentionAsync(
   assetId: 'package:speech_kit/speech_kit.dart',
 )
 external void _skSpeechPrepareCustomLanguageModelAsync(
+  Pointer<Utf8> jsonUtf8,
+  Pointer<NativeFunction<SkAssetCallbackNative>> callback,
+);
+
+@Native<
+  Void Function(
+    Pointer<Utf8>,
+    Pointer<NativeFunction<SkAssetCallbackNative>>,
+  )
+>(
+  symbol: 'sk_speech_export_custom_language_model_data_async',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external void _skSpeechExportCustomLanguageModelDataAsync(
   Pointer<Utf8> jsonUtf8,
   Pointer<NativeFunction<SkAssetCallbackNative>> callback,
 );
@@ -697,6 +712,62 @@ Future<void> prepareCustomLanguageModelImpl({
     }
   });
   _skSpeechPrepareCustomLanguageModelAsync(jsonPtr, callback.nativeFunction);
+  return completer.future;
+}
+
+Future<void> exportCustomLanguageModelDataImpl(
+  CustomLanguageModelExportRequest request,
+) {
+  _ensureAppleDesktop();
+  if (request.localeId.isEmpty ||
+      request.identifier.isEmpty ||
+      request.version.isEmpty ||
+      request.exportPath.isEmpty) {
+    return Future.error(
+      const SpeechKitException(
+        'localeId, identifier, version, and exportPath must be non-empty.',
+        failure: SpeechKitFailure.operationFailed,
+      ),
+    );
+  }
+  for (final p in request.phraseCounts) {
+    if (p.count < 0) {
+      return Future.error(
+        const SpeechKitException(
+          'phraseCounts entries must use a non-negative count.',
+          failure: SpeechKitFailure.operationFailed,
+        ),
+      );
+    }
+  }
+  final json = jsonEncode(request.toJson());
+  final jsonPtr = json.toNativeUtf8();
+  final completer = Completer<void>();
+  late final NativeCallable<Void Function(Int32, Int32, Pointer<Utf8>)>
+  callback;
+  callback = NativeCallable.listener((int _, int err, Pointer<Utf8> msg) {
+    try {
+      if (err != 0) {
+        final text = _mallocUtf8ToDartAndFree(msg);
+        completer.completeError(
+          SpeechKitException(
+            text ?? 'exportCustomLanguageModelData failed (error code $err)',
+            failure: SpeechKitFailure.operationFailed,
+          ),
+        );
+        return;
+      }
+      completer.complete();
+    } on Object catch (e, st) {
+      if (!completer.isCompleted) {
+        completer.completeError(e, st);
+      }
+    } finally {
+      malloc.free(jsonPtr);
+      callback.close();
+    }
+  });
+  _skSpeechExportCustomLanguageModelDataAsync(jsonPtr, callback.nativeFunction);
   return completer.future;
 }
 
