@@ -40,6 +40,14 @@ void main() {
       ]);
       expect(status, isA<AssetInventoryStatus>());
 
+      final dictationStatus = await kit.assetInventoryStatus([
+        const DictationTranscriberConfiguration(
+          localeId: 'en-US',
+          preset: DictationTranscriberPreset.shortDictation,
+        ),
+      ]);
+      expect(dictationStatus, isA<AssetInventoryStatus>());
+
       // Analyzer session argument validation (native analysis requires a
       // real audio file + installed assets, which we don't do in unit tests).
       expect(

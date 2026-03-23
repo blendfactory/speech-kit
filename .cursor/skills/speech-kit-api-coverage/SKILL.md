@@ -46,7 +46,7 @@ Update rows as implementation progresses.
 | API / capability | Status | Notes |
 |------------------|--------|-------|
 | `SpeechTranscriber` (locale, presets/options) | ✅ | Dart: `SpeechTranscriberConfiguration`, `SpeechTranscriberPreset`; Swift constructs `SpeechTranscriber(locale:preset:)` for both asset inventory and file-based analysis. |
-| `DictationTranscriber` (optional) | ❌ | |
+| `DictationTranscriber` (optional) | ✅ | Dart: `DictationTranscriberConfiguration` + `DictationTranscriberPreset`; Swift `DictationTranscriber(locale:preset:)` for asset inventory and file-based analysis. |
 | `SpeechDetector` (optional) | ❌ | |
 
 ### Analyzer session

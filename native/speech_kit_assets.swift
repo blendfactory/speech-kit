@@ -19,31 +19,54 @@ private func parseModules(data: Data) throws -> [any SpeechModule] {
   }
   var out: [any SpeechModule] = []
   for item in arr {
-    guard (item["kind"] as? String) == "transcriber" else {
-      throw NSError(
-        domain: "speech_kit",
-        code: 2,
-        userInfo: [NSLocalizedDescriptionKey: "Unsupported module kind (only transcriber)"],
-      )
-    }
+    let kind = item["kind"] as? String ?? ""
     let localeId = item["locale"] as? String ?? ""
     let presetIdx = item["preset"] as? Int ?? -1
     let locale = Locale(identifier: localeId)
-    let preset: SpeechTranscriber.Preset
-    switch presetIdx {
-    case 0: preset = .transcription
-    case 1: preset = .transcriptionWithAlternatives
-    case 2: preset = .timeIndexedTranscriptionWithAlternatives
-    case 3: preset = .progressiveTranscription
-    case 4: preset = .timeIndexedProgressiveTranscription
+
+    switch kind {
+    case "transcriber":
+      let preset: SpeechTranscriber.Preset
+      switch presetIdx {
+      case 0: preset = .transcription
+      case 1: preset = .transcriptionWithAlternatives
+      case 2: preset = .timeIndexedTranscriptionWithAlternatives
+      case 3: preset = .progressiveTranscription
+      case 4: preset = .timeIndexedProgressiveTranscription
+      default:
+        throw NSError(
+          domain: "speech_kit",
+          code: 3,
+          userInfo: [NSLocalizedDescriptionKey: "Invalid SpeechTranscriber preset index"],
+        )
+      }
+      out.append(SpeechTranscriber(locale: locale, preset: preset))
+
+    case "dictation":
+      let preset: DictationTranscriber.Preset
+      switch presetIdx {
+      case 0: preset = .phrase
+      case 1: preset = .shortDictation
+      case 2: preset = .progressiveShortDictation
+      case 3: preset = .longDictation
+      case 4: preset = .progressiveLongDictation
+      case 5: preset = .timeIndexedLongDictation
+      default:
+        throw NSError(
+          domain: "speech_kit",
+          code: 3,
+          userInfo: [NSLocalizedDescriptionKey: "Invalid DictationTranscriber preset index"],
+        )
+      }
+      out.append(DictationTranscriber(locale: locale, preset: preset))
+
     default:
       throw NSError(
         domain: "speech_kit",
-        code: 3,
-        userInfo: [NSLocalizedDescriptionKey: "Invalid transcriber preset index"],
+        code: 2,
+        userInfo: [NSLocalizedDescriptionKey: "Unsupported module kind (use transcriber or dictation)"],
       )
     }
-    out.append(SpeechTranscriber(locale: locale, preset: preset))
   }
   return out
 }
@@ -204,7 +227,7 @@ private var _nextAnalyzerSessionId: Int32 = 1
 private var _analyzerSessions: [Int32: Task<Void, Never>] = [:]
 
 @available(macOS 26.0, *)
-private func sendAnalyzerResult(
+private func sendSpeechTranscriberAnalyzerResult(
   _ result: SpeechTranscriber.Result,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) {
@@ -232,6 +255,36 @@ private func sendAnalyzerResult(
     // If we fail to serialize a single chunk, keep analysis running.
     // (We intentionally do not end the stream from inside this helper;
     // Dart may close the callback while Swift is still producing results.)
+    return
+  }
+}
+
+@available(macOS 26.0, *)
+private func sendDictationTranscriberAnalyzerResult(
+  _ result: DictationTranscriber.Result,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) {
+  let plainText = String(result.text.characters)
+  let altTexts = result.alternatives.map { String($0.characters) }
+
+  let rangeStartSeconds = CMTimeGetSeconds(result.range.start)
+  let rangeDurationSeconds = CMTimeGetSeconds(result.range.duration)
+  let finalizationSeconds = CMTimeGetSeconds(result.resultsFinalizationTime)
+  let offsetSeconds = max(0, finalizationSeconds - rangeStartSeconds)
+
+  let payload: [String: Any] = [
+    "text": plainText,
+    "rangeStartSeconds": rangeStartSeconds,
+    "rangeDurationSeconds": rangeDurationSeconds,
+    "resultsFinalizationOffsetSeconds": offsetSeconds,
+    "alternativeTexts": altTexts,
+  ]
+
+  do {
+    let data = try JSONSerialization.data(withJSONObject: payload, options: [])
+    let jsonStr = String(data: data, encoding: .utf8) ?? "{}"
+    callback(0, 0, dupCString(jsonStr))
+  } catch {
     return
   }
 }
@@ -265,9 +318,25 @@ private func runAnalyzerFileSession(
   var resultsTask: Task<Void, Error>?
   do {
     let modules = try parseModules(data: modulesData)
-    let transcribers = modules.compactMap { $0 as? SpeechTranscriber }
-    guard let transcriber = transcribers.first else {
-      callback(-1, 2, dupCString("No SpeechTranscriber module found in modules JSON"))
+
+    var speechTranscriber: SpeechTranscriber?
+    var dictationTranscriber: DictationTranscriber?
+    for m in modules {
+      if let s = m as? SpeechTranscriber {
+        speechTranscriber = s
+        break
+      }
+      if let d = m as? DictationTranscriber {
+        dictationTranscriber = d
+        break
+      }
+    }
+    guard speechTranscriber != nil || dictationTranscriber != nil else {
+      callback(
+        -1,
+        2,
+        dupCString("No SpeechTranscriber or DictationTranscriber module in modules JSON"),
+      )
       return
     }
 
@@ -276,10 +345,19 @@ private func runAnalyzerFileSession(
     let audioFile = try AVAudioFile(forReading: audioURL)
 
     // Start draining results first so we don't miss early phrases.
-    resultsTask = Task<Void, Error> {
-      for try await r in transcriber.results {
-        if Task.isCancelled { break }
-        sendAnalyzerResult(r, callback: callback)
+    if let transcriber = speechTranscriber {
+      resultsTask = Task<Void, Error> {
+        for try await r in transcriber.results {
+          if Task.isCancelled { break }
+          sendSpeechTranscriberAnalyzerResult(r, callback: callback)
+        }
+      }
+    } else if let transcriber = dictationTranscriber {
+      resultsTask = Task<Void, Error> {
+        for try await r in transcriber.results {
+          if Task.isCancelled { break }
+          sendDictationTranscriberAnalyzerResult(r, callback: callback)
+        }
       }
     }
 

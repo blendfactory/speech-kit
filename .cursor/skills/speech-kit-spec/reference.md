@@ -32,7 +32,7 @@ Flow matches Apple’s [`SpeechAnalyzer`](https://developer.apple.com/documentat
 
 | Apple type | Role |
 |------------|------|
-| `DictationTranscriber` | Dictation-style module (parallel to `SpeechTranscriber`) |
+| `DictationTranscriber` | Dictation-style module (parallel to `SpeechTranscriber`); exposed via `DictationTranscriberConfiguration` in Dart |
 | `SpeechDetector` | Voice-activity style analysis module |
 | `AnalysisContext` | Shared context / custom vocabulary hooks |
 | `SFSpeechLanguageModel` | Custom language model configuration (see framework docs; name retains `SF` prefix in Apple API) |

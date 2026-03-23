@@ -210,6 +210,12 @@ String _encodeSpeechModulesJson(List<SpeechModuleConfiguration> modules) {
           'locale': localeId,
           'preset': preset.index,
         });
+      case DictationTranscriberConfiguration(:final localeId, :final preset):
+        list.add({
+          'kind': 'dictation',
+          'locale': localeId,
+          'preset': preset.index,
+        });
     }
   }
   return jsonEncode(list);
