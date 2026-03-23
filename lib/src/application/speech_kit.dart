@@ -113,8 +113,8 @@ class SpeechKit {
   /// for that `AVAudioFormat`). Prefer [bestAvailableAudioFormat] for a
   /// compatible layout.
   ///
-  /// This passes a **single buffer** as one `AnalyzerInput`; streaming multiple
-  /// chunks is not yet exposed from Dart.
+  /// This passes a **single buffer** as one `AnalyzerInput`. For multiple
+  /// chunks over time, use [analyzePcmStream].
   SpeechAnalysisSession analyzePcm(
     Uint8List pcmBytes, {
     required CompatibleAudioFormat format,
@@ -123,6 +123,29 @@ class SpeechKit {
   }) {
     return analyzePcmImpl(
       pcmBytes,
+      format: format,
+      modules: modules,
+      analysisContext: analysisContext,
+    );
+  }
+
+  /// Starts a `SpeechAnalyzer` session from a **stream** of PCM chunks
+  /// (`AsyncSequence` of `AnalyzerInput` + `analyzeSequence(_:)`).
+  ///
+  /// Each emitted [Uint8List] must be **frame-aligned** for [format] (same
+  /// rules as [analyzePcm]). Empty chunks are skipped. Use a **single-listen**
+  /// stream; the implementation subscribes once.
+  ///
+  /// When the stream completes without error, native input is finished and the
+  /// analyzer can finalize. Errors during iteration cancel the session.
+  SpeechAnalysisSession analyzePcmStream(
+    Stream<Uint8List> pcmChunks, {
+    required CompatibleAudioFormat format,
+    required List<SpeechModuleConfiguration> modules,
+    AnalysisContext? analysisContext,
+  }) {
+    return analyzePcmStreamImpl(
+      pcmChunks,
       format: format,
       modules: modules,
       analysisContext: analysisContext,

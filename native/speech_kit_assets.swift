@@ -389,6 +389,70 @@ private func _unregisterAnalyzerSession(_ sessionId: Int32) {
   _analyzerSessions[sessionId] = nil
 }
 
+// MARK: - PCM stream bridge (multi-chunk AnalyzerInput)
+
+private let _pcmStreamLock = NSLock()
+nonisolated(unsafe) private var _pcmStreamBridges: [Int32: PcmStreamBridge] = [:]
+
+@available(macOS 26.0, *)
+private final class PcmStreamBridge: @unchecked Sendable {
+  let format: AVAudioFormat
+  private let lock = NSLock()
+  private var continuation: AsyncStream<AnalyzerInput>.Continuation?
+
+  init(format: AVAudioFormat, continuation: AsyncStream<AnalyzerInput>.Continuation) {
+    self.format = format
+    self.continuation = continuation
+  }
+
+  func pushPCM(_ data: Data) throws {
+    lock.lock()
+    defer { lock.unlock() }
+    guard let cont = continuation else {
+      throw NSError(
+        domain: "speech_kit",
+        code: 1,
+        userInfo: [NSLocalizedDescriptionKey: "PCM stream already finished"],
+      )
+    }
+    if data.isEmpty {
+      return
+    }
+    let buf = try avAudioPCMBuffer(pcmData: data, format: format)
+    cont.yield(AnalyzerInput(buffer: buf))
+  }
+
+  func finishInput() {
+    lock.lock()
+    defer { lock.unlock() }
+    continuation?.finish()
+    continuation = nil
+  }
+}
+
+@available(macOS 26.0, *)
+private func _registerPcmStream(sessionId: Int32, bridge: PcmStreamBridge) {
+  _pcmStreamLock.lock()
+  defer { _pcmStreamLock.unlock() }
+  _pcmStreamBridges[sessionId] = bridge
+}
+
+@available(macOS 26.0, *)
+private func _unregisterPcmStreamIfPresent(_ sessionId: Int32) {
+  _pcmStreamLock.lock()
+  defer { _pcmStreamLock.unlock() }
+  if let bridge = _pcmStreamBridges.removeValue(forKey: sessionId) {
+    bridge.finishInput()
+  }
+}
+
+@available(macOS 26.0, *)
+private func _pcmStreamBridge(for sessionId: Int32) -> PcmStreamBridge? {
+  _pcmStreamLock.lock()
+  defer { _pcmStreamLock.unlock() }
+  return _pcmStreamBridges[sessionId]
+}
+
 @available(macOS 26.0, *)
 private func sendSpeechTranscriberAnalyzerResult(
   _ result: SpeechTranscriber.Result,
@@ -667,6 +731,115 @@ private func runAnalyzerPcmSession(
   }
 }
 
+@available(macOS 26.0, *)
+private func runAnalyzerPcmStreamSession(
+  modulesJsonUtf8: UnsafePointer<CChar>?,
+  formatJsonUtf8: UnsafePointer<CChar>?,
+  analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  sessionId: Int32,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) async {
+  guard let modulesJsonUtf8, let formatJsonUtf8 else {
+    callback(-1, 1, dupCString("Missing modulesJson or formatJson"))
+    return
+  }
+
+  defer {
+    _unregisterPcmStreamIfPresent(sessionId)
+    _unregisterAnalyzerSession(sessionId)
+  }
+
+  let modulesStr = String(cString: modulesJsonUtf8)
+  let formatStr = String(cString: formatJsonUtf8)
+  guard let modulesData = modulesStr.data(using: .utf8) else {
+    callback(-1, 1, dupCString("Invalid utf-8 modulesJson"))
+    return
+  }
+
+  var analyzer: SpeechAnalyzer?
+  var resultsTask: Task<Void, Error>?
+  do {
+    let modules = try parseModules(data: modulesData)
+
+    var speechTranscriber: SpeechTranscriber?
+    var dictationTranscriber: DictationTranscriber?
+    for m in modules {
+      if let s = m as? SpeechTranscriber {
+        speechTranscriber = s
+        break
+      }
+      if let d = m as? DictationTranscriber {
+        dictationTranscriber = d
+        break
+      }
+    }
+    guard speechTranscriber != nil || dictationTranscriber != nil else {
+      callback(
+        -1,
+        2,
+        dupCString("No SpeechTranscriber or DictationTranscriber module in modules JSON"),
+      )
+      return
+    }
+
+    let avFormat = try avAudioFormatFromCompatibleJsonString(formatStr)
+
+    analyzer = SpeechAnalyzer(modules: modules)
+    if let ctx = try analysisContextFromJsonUtf8(analysisContextJsonUtf8) {
+      try await analyzer!.setContext(ctx)
+    }
+
+    try await analyzer!.prepareToAnalyze(
+      in: avFormat,
+      withProgressReadyHandler: nil,
+    )
+
+    let (inputStream, streamContinuation) = AsyncStream<AnalyzerInput>.makeStream(
+      of: AnalyzerInput.self,
+    )
+    let bridge = PcmStreamBridge(format: avFormat, continuation: streamContinuation)
+    _registerPcmStream(sessionId: sessionId, bridge: bridge)
+
+    if let transcriber = speechTranscriber {
+      resultsTask = Task<Void, Error> {
+        for try await r in transcriber.results {
+          if Task.isCancelled { break }
+          sendSpeechTranscriberAnalyzerResult(r, callback: callback)
+        }
+      }
+    } else if let transcriber = dictationTranscriber {
+      resultsTask = Task<Void, Error> {
+        for try await r in transcriber.results {
+          if Task.isCancelled { break }
+          sendDictationTranscriberAnalyzerResult(r, callback: callback)
+        }
+      }
+    }
+
+    let lastSampleTime = try await analyzer!.analyzeSequence(inputStream)
+
+    if let lastSampleTime {
+      try await analyzer!.finalizeAndFinish(through: lastSampleTime)
+    } else {
+      await analyzer!.cancelAndFinishNow()
+    }
+
+    try await resultsTask!.value
+    callback(1, 0, nil)
+  } catch is CancellationError {
+    if let analyzer {
+      await analyzer.cancelAndFinishNow()
+    }
+    if let task = resultsTask {
+      _ = try? await task.value
+    }
+    callback(1, 0, nil)
+  } catch {
+    let ns = error as NSError
+    callback(-1, 1, dupCString(ns.localizedDescription))
+  }
+}
+
 @_cdecl("sk_speech_analyzer_analyze_file_async")
 public func sk_speech_analyzer_analyze_file_async(
   modulesJsonUtf8: UnsafePointer<CChar>?,
@@ -743,6 +916,79 @@ public func sk_speech_analyzer_analyze_pcm_async(
   _analyzerSessionsLock.unlock()
 
   return sessionId
+}
+
+@_cdecl("sk_speech_analyzer_start_pcm_stream_async")
+public func sk_speech_analyzer_start_pcm_stream_async(
+  modulesJsonUtf8: UnsafePointer<CChar>?,
+  formatJsonUtf8: UnsafePointer<CChar>?,
+  analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) -> Int32 {
+  if #unavailable(macOS 26.0) {
+    callback(-1, 4, dupCString("SpeechAnalyzer requires macOS 26"))
+    return -1
+  }
+
+  _analyzerSessionsLock.lock()
+  let sessionId = _nextAnalyzerSessionId
+  _nextAnalyzerSessionId &+= 1
+  _analyzerSessionsLock.unlock()
+
+  let task = Task {
+    await runAnalyzerPcmStreamSession(
+      modulesJsonUtf8: modulesJsonUtf8,
+      formatJsonUtf8: formatJsonUtf8,
+      analysisContextJsonUtf8: analysisContextJsonUtf8,
+      sessionId: sessionId,
+      callback: callback,
+    )
+  }
+
+  _analyzerSessionsLock.lock()
+  _analyzerSessions[sessionId] = task
+  _analyzerSessionsLock.unlock()
+
+  return sessionId
+}
+
+@_cdecl("sk_speech_analyzer_push_pcm_chunk")
+public func sk_speech_analyzer_push_pcm_chunk(
+  sessionId: Int32,
+  pcmBytes: UnsafePointer<UInt8>?,
+  pcmByteLength: Int64,
+) -> Int32 {
+  if #unavailable(macOS 26.0) {
+    return -1
+  }
+  if pcmByteLength <= 0 {
+    return 0
+  }
+  guard let pcmBytes else {
+    return -2
+  }
+  let data = Data(bytes: pcmBytes, count: Int(pcmByteLength))
+  guard let bridge = _pcmStreamBridge(for: sessionId) else {
+    return -1
+  }
+  do {
+    try bridge.pushPCM(data)
+    return 0
+  } catch {
+    return -2
+  }
+}
+
+@_cdecl("sk_speech_analyzer_finish_pcm_input")
+public func sk_speech_analyzer_finish_pcm_input(sessionId: Int32) {
+  if #unavailable(macOS 26.0) {
+    return
+  }
+  _pcmStreamLock.lock()
+  defer { _pcmStreamLock.unlock() }
+  if let bridge = _pcmStreamBridges.removeValue(forKey: sessionId) {
+    bridge.finishInput()
+  }
 }
 
 @_cdecl("sk_speech_analyzer_cancel_and_finish_now")

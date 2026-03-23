@@ -113,6 +113,20 @@ void main() {
           ),
         ),
       );
+      expect(
+        () => kit.analyzePcmStream(
+          const Stream.empty(),
+          format: fmt,
+          modules: const [],
+        ),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
     } else {
       await expectLater(
         kit.speechRecognitionAuthorizationStatus(),

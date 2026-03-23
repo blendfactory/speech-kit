@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
@@ -57,6 +58,15 @@ SpeechAnalysisSession analyzeFileImpl(
 
 SpeechAnalysisSession analyzePcmImpl(
   Uint8List pcmBytes, {
+  required CompatibleAudioFormat format,
+  required List<SpeechModuleConfiguration> modules,
+  AnalysisContext? analysisContext,
+}) {
+  throw _noIo();
+}
+
+SpeechAnalysisSession analyzePcmStreamImpl(
+  Stream<Uint8List> pcmChunks, {
   required CompatibleAudioFormat format,
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,

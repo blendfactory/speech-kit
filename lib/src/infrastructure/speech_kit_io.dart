@@ -156,6 +156,50 @@ external int _skSpeechAnalyzerAnalyzePcmAsync(
 );
 
 @Native<
+  Int32 Function(
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>>,
+  )
+>(
+  symbol: 'sk_speech_analyzer_start_pcm_stream_async',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external int _skSpeechAnalyzerStartPcmStreamAsync(
+  Pointer<Utf8> modulesJsonUtf8,
+  Pointer<Utf8> formatJsonUtf8,
+  Pointer<Utf8> analysisContextJsonUtf8,
+  Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>> callback,
+);
+
+@Native<
+  Int32 Function(
+    Int32,
+    Pointer<Uint8>,
+    Int64,
+  )
+>(
+  symbol: 'sk_speech_analyzer_push_pcm_chunk',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external int _skSpeechAnalyzerPushPcmChunk(
+  int sessionId,
+  Pointer<Uint8> pcmBytes,
+  int pcmByteLength,
+);
+
+@Native<
+  Void Function(
+    Int32,
+  )
+>(
+  symbol: 'sk_speech_analyzer_finish_pcm_input',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external void _skSpeechAnalyzerFinishPcmInput(int sessionId);
+
+@Native<
   Void Function(
     Int32,
   )
@@ -521,8 +565,10 @@ SpeechAnalysisSession _speechAnalysisSessionFromNative(
   List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
   int Function(Pointer<NativeFunction<SkSpeechAnalyzerEventCallbackNative>>)
-  invokeNative,
-) {
+  invokeNative, {
+  List<bool>? pcmStreamCancelFlag,
+  void Function(int sessionId)? onSessionStarted,
+}) {
   _ensureAppleDesktop();
   if (modules.isEmpty) {
     throw const SpeechKitException(
@@ -540,6 +586,7 @@ SpeechAnalysisSession _speechAnalysisSessionFromNative(
       return;
     }
     cancelRequested = true;
+    pcmStreamCancelFlag?[0] = true;
     if (nativeSessionId > 0) {
       _skSpeechAnalyzerCancelAndFinishNow(nativeSessionId);
     }
@@ -625,6 +672,7 @@ SpeechAnalysisSession _speechAnalysisSessionFromNative(
   );
 
   nativeSessionId = invokeNative(callback.nativeFunction);
+  onSessionStarted?.call(nativeSessionId);
 
   return SpeechAnalysisSession(
     id: SpeechAnalysisSessionId(nativeSessionId),
@@ -632,6 +680,49 @@ SpeechAnalysisSession _speechAnalysisSessionFromNative(
     finalizeAndFinish: () => doneCompleter.future,
     cancelAndFinishNow: sessionCancel,
   );
+}
+
+Future<void> _pumpPcmStreamToNative(
+  int sessionId,
+  Stream<Uint8List> pcmChunks,
+  List<bool> cancelFlag,
+) async {
+  try {
+    await for (final chunk in pcmChunks) {
+      if (cancelFlag[0]) {
+        return;
+      }
+      if (chunk.isEmpty) {
+        continue;
+      }
+      final ptr = malloc<Uint8>(chunk.length);
+      ptr.asTypedList(chunk.length).setAll(0, chunk);
+      try {
+        final code = _skSpeechAnalyzerPushPcmChunk(
+          sessionId,
+          ptr,
+          chunk.length,
+        );
+        if (code != 0) {
+          throw SpeechKitException(
+            code == -1
+                ? 'PCM stream push failed: no active session or stream ended.'
+                : 'PCM stream push failed: invalid buffer (frame alignment).',
+            failure: SpeechKitFailure.operationFailed,
+          );
+        }
+      } finally {
+        malloc.free(ptr);
+      }
+    }
+    if (!cancelFlag[0]) {
+      _skSpeechAnalyzerFinishPcmInput(sessionId);
+    }
+  } on Object {
+    if (!cancelFlag[0]) {
+      _skSpeechAnalyzerCancelAndFinishNow(sessionId);
+    }
+  }
 }
 
 SpeechAnalysisSession analyzeFileImpl(
@@ -719,4 +810,49 @@ SpeechAnalysisSession analyzePcmImpl(
       malloc.free(pcmPtr);
     }
   });
+}
+
+SpeechAnalysisSession analyzePcmStreamImpl(
+  Stream<Uint8List> pcmChunks, {
+  required CompatibleAudioFormat format,
+  required List<SpeechModuleConfiguration> modules,
+  AnalysisContext? analysisContext,
+}) {
+  final modulesJson = _encodeSpeechModulesJson(modules);
+  final formatJson = jsonEncode(format.toJson());
+  final pcmStreamCancelFlag = <bool>[false];
+
+  return _speechAnalysisSessionFromNative(
+    modules,
+    analysisContext,
+    (nativeCb) {
+      final modulesJsonPtr = modulesJson.toNativeUtf8();
+      final formatJsonPtr = formatJson.toNativeUtf8();
+      final contextJson = _encodeAnalysisContextJson(analysisContext);
+      final contextJsonPtr = contextJson == null
+          ? nullptr
+          : contextJson.toNativeUtf8();
+
+      try {
+        return _skSpeechAnalyzerStartPcmStreamAsync(
+          modulesJsonPtr,
+          formatJsonPtr,
+          contextJsonPtr,
+          nativeCb,
+        );
+      } finally {
+        malloc.free(modulesJsonPtr);
+        malloc.free(formatJsonPtr);
+        if (contextJsonPtr != nullptr) {
+          malloc.free(contextJsonPtr);
+        }
+      }
+    },
+    pcmStreamCancelFlag: pcmStreamCancelFlag,
+    onSessionStarted: (sessionId) {
+      unawaited(
+        _pumpPcmStreamToNative(sessionId, pcmChunks, pcmStreamCancelFlag),
+      );
+    },
+  );
 }
