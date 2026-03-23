@@ -38,7 +38,7 @@ Update rows as implementation progresses.
 
 | API / capability | Status | Notes |
 |------------------|--------|-------|
-| `AssetInventory.status(forModules:)` | ✅ | Dart: `SpeechKit.assetInventoryStatus` + `SpeechTranscriberConfiguration`; Swift bridge maps `SpeechTranscriber` modules → `AssetInventory.status`. |
+| `AssetInventory.status(forModules:)` | ✅ | Dart: `SpeechKit.assetInventoryStatus` + module configs; Swift maps JSON → `SpeechModule` list → `AssetInventory.status`. |
 | `AssetInventory.assetInstallationRequest(supporting:)` + install | ✅ | Dart: `SpeechKit.ensureAssetsInstalled`; Swift bridge maps modules → `assetInstallationRequest` → `downloadAndInstall`. |
 
 ### Transcription module
@@ -47,7 +47,7 @@ Update rows as implementation progresses.
 |------------------|--------|-------|
 | `SpeechTranscriber` (locale, presets/options) | ✅ | Dart: `SpeechTranscriberConfiguration`, `SpeechTranscriberPreset`; Swift constructs `SpeechTranscriber(locale:preset:)` for both asset inventory and file-based analysis. |
 | `DictationTranscriber` (optional) | ✅ | Dart: `DictationTranscriberConfiguration` + `DictationTranscriberPreset`; Swift `DictationTranscriber(locale:preset:)` for asset inventory and file-based analysis. |
-| `SpeechDetector` (optional) | ❌ | |
+| `SpeechDetector` (optional) | ✅ | Dart: `SpeechDetectorConfiguration` + `SpeechDetectorSensitivity`; Swift `SpeechDetector(detectionOptions:reportResults:)`. Pair with a transcriber module per Apple. |
 
 ### Analyzer session
 
@@ -59,7 +59,7 @@ Update rows as implementation progresses.
 | `analyzeSequence(_:)` or `start(inputSequence:)` | ✅ | File-based `analyzeSequence(from:)` supported. |
 | Result consumption (`SpeechTranscriber.results` / `AsyncSequence`) | ✅ | Swift drains `transcriber.results` and forwards each phrase to Dart `Stream<TranscriptionSegment>`. |
 | Finish / cancel (`finalizeAndFinish`, `cancelAndFinishNow`, …) | ✅ | Uses `finalizeAndFinish(through:)` or `cancelAndFinishNow()` depending on input. Stream cancel maps to native cancel. |
-| `prepareToAnalyze`, model retention / priority options (if exposed) | ❌ | |
+| `prepareToAnalyze`, model retention / priority options (if exposed) | 🚧 | File sessions: Swift calls `prepareToAnalyze(in: audioFile.processingFormat, …)` before `analyzeSequence(from:)`. No Dart surface for custom format / progress handler yet. Model retention / priority TBD. |
 
 ### Custom language model (optional)
 

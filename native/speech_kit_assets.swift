@@ -60,11 +60,33 @@ private func parseModules(data: Data) throws -> [any SpeechModule] {
       }
       out.append(DictationTranscriber(locale: locale, preset: preset))
 
+    case "speechDetector":
+      let sensIdx = item["sensitivity"] as? Int ?? 1
+      let sensitivity: SpeechDetector.SensitivityLevel
+      switch sensIdx {
+      case 0: sensitivity = .low
+      case 1: sensitivity = .medium
+      case 2: sensitivity = .high
+      default:
+        throw NSError(
+          domain: "speech_kit",
+          code: 3,
+          userInfo: [NSLocalizedDescriptionKey: "Invalid SpeechDetector sensitivity index"],
+        )
+      }
+      let reportResults = item["reportResults"] as? Bool ?? false
+      out.append(
+        SpeechDetector(
+          detectionOptions: SpeechDetector.DetectionOptions(sensitivityLevel: sensitivity),
+          reportResults: reportResults,
+        ),
+      )
+
     default:
       throw NSError(
         domain: "speech_kit",
         code: 2,
-        userInfo: [NSLocalizedDescriptionKey: "Unsupported module kind (use transcriber or dictation)"],
+        userInfo: [NSLocalizedDescriptionKey: "Unsupported module kind"],
       )
     }
   }
@@ -343,6 +365,11 @@ private func runAnalyzerFileSession(
     analyzer = SpeechAnalyzer(modules: modules)
     let audioURL = URL(fileURLWithPath: audioPath)
     let audioFile = try AVAudioFile(forReading: audioURL)
+
+    try await analyzer!.prepareToAnalyze(
+      in: audioFile.processingFormat,
+      withProgressReadyHandler: nil,
+    )
 
     // Start draining results first so we don't miss early phrases.
     if let transcriber = speechTranscriber {

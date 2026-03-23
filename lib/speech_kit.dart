@@ -8,6 +8,7 @@ export 'src/domain/errors/speech_kit_exception.dart';
 export 'src/domain/value_objects/assets/asset_inventory_status.dart';
 export 'src/domain/value_objects/audio/compatible_audio_format.dart';
 export 'src/domain/value_objects/configuration/dictation_transcriber_preset.dart';
+export 'src/domain/value_objects/configuration/speech_detector_sensitivity.dart';
 export 'src/domain/value_objects/configuration/speech_module_configuration.dart';
 export 'src/domain/value_objects/configuration/speech_transcriber_preset.dart';
 export 'src/domain/value_objects/identifiers/speech_analysis_session_id.dart';

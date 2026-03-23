@@ -216,6 +216,15 @@ String _encodeSpeechModulesJson(List<SpeechModuleConfiguration> modules) {
           'locale': localeId,
           'preset': preset.index,
         });
+      case SpeechDetectorConfiguration(
+        :final sensitivity,
+        :final reportResults,
+      ):
+        list.add({
+          'kind': 'speechDetector',
+          'sensitivity': sensitivity.index,
+          'reportResults': reportResults,
+        });
     }
   }
   return jsonEncode(list);
