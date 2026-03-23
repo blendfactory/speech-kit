@@ -1199,3 +1199,17 @@ public func sk_speech_analyzer_cancel_and_finish_now(sessionId: Int32) {
   _analyzerSessionsLock.unlock()
   task?.cancel()
 }
+
+@_cdecl("sk_speech_models_end_retention_async")
+public func sk_speech_models_end_retention_async(
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) {
+  if #unavailable(macOS 26.0) {
+    callback(-1, 4, dupCString("SpeechModels requires macOS 26"))
+    return
+  }
+  Task {
+    await SpeechModels.endRetention()
+    callback(0, 0, nil)
+  }
+}

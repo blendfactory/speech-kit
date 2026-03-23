@@ -109,6 +109,18 @@ external void _skSpeechBestAvailableAudioFormatAsync(
   Pointer<NativeFunction<SkAssetCallbackNative>> callback,
 );
 
+@Native<
+  Void Function(
+    Pointer<NativeFunction<SkAssetCallbackNative>>,
+  )
+>(
+  symbol: 'sk_speech_models_end_retention_async',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external void _skSpeechModelsEndRetentionAsync(
+  Pointer<NativeFunction<SkAssetCallbackNative>> callback,
+);
+
 typedef SkSpeechAnalyzerEventCallbackNative =
     Void Function(
       Int32 eventType,
@@ -573,6 +585,36 @@ Future<CompatibleAudioFormat> bestAvailableAudioFormatImpl(
     }
   });
   _skSpeechBestAvailableAudioFormatAsync(jsonPtr, callback.nativeFunction);
+  return completer.future;
+}
+
+Future<void> endSpeechModelRetentionImpl() {
+  _ensureAppleDesktop();
+  final completer = Completer<void>();
+  late final NativeCallable<Void Function(Int32, Int32, Pointer<Utf8>)>
+  callback;
+  callback = NativeCallable.listener((int _, int err, Pointer<Utf8> msg) {
+    try {
+      if (err != 0) {
+        final text = _mallocUtf8ToDartAndFree(msg);
+        completer.completeError(
+          SpeechKitException(
+            text ?? 'SpeechModels.endRetention failed (error code $err)',
+            failure: SpeechKitFailure.operationFailed,
+          ),
+        );
+        return;
+      }
+      completer.complete();
+    } on Object catch (e, st) {
+      if (!completer.isCompleted) {
+        completer.completeError(e, st);
+      }
+    } finally {
+      callback.close();
+    }
+  });
+  _skSpeechModelsEndRetentionAsync(callback.nativeFunction);
   return completer.future;
 }
 

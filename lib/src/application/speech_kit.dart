@@ -83,6 +83,17 @@ class SpeechKit {
     return bestAvailableAudioFormatImpl(modules);
   }
 
+  /// Ends retained on-device speech models (`SpeechModels.endRetention()`).
+  ///
+  /// Call when your app no longer needs models kept after analysis (for example
+  /// after using [SpeechAnalyzerModelRetention.lingering] or
+  /// [SpeechAnalyzerModelRetention.processLifetime]).
+  ///
+  /// **macOS 26+** with native dylib.
+  Future<void> endSpeechModelRetention() {
+    return endSpeechModelRetentionImpl();
+  }
+
   /// Starts a file-based `SpeechAnalyzer` session and streams transcription
   /// results as [SpeechAnalysisSession.results].
   ///

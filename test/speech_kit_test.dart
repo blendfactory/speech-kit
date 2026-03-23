@@ -69,6 +69,8 @@ void main() {
       ]);
       expect(vadStatus, isA<AssetInventoryStatus>());
 
+      await expectLater(kit.endSpeechModelRetention(), completes);
+
       // Analyzer session argument validation (native analysis requires a
       // real audio file + installed assets, which we don't do in unit tests).
       expect(

@@ -49,6 +49,10 @@ Future<CompatibleAudioFormat> bestAvailableAudioFormatImpl(
   return Future.error(_noIo());
 }
 
+Future<void> endSpeechModelRetentionImpl() {
+  return Future.error(_noIo());
+}
+
 SpeechAnalysisSession analyzeFileImpl(
   String audioFilePath, {
   required List<SpeechModuleConfiguration> modules,
