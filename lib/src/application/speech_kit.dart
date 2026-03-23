@@ -91,6 +91,10 @@ class SpeechKit {
   /// - Optional [analysisContext] maps to Apple
   ///   `AnalysisContext.contextualStrings` (bias vocabulary) via native
   ///   `setContext` before analysis.
+  /// - [prepareAudioFormat] and [onPrepareProgress] map to
+  ///   `prepareToAnalyze(in:withProgressReadyHandler:)` (expected input format
+  ///   and `Progress.fractionCompleted`). If [prepareAudioFormat] is null, the
+  ///   file’s `processingFormat` is used for preparation.
   /// - Call [SpeechAnalysisSession.finalizeAndFinish] or
   ///   [SpeechAnalysisSession.cancelAndFinishNow] to end the native session
   ///   explicitly when needed.
@@ -98,11 +102,15 @@ class SpeechKit {
     String audioFilePath, {
     required List<SpeechModuleConfiguration> modules,
     AnalysisContext? analysisContext,
+    CompatibleAudioFormat? prepareAudioFormat,
+    void Function(double fractionCompleted)? onPrepareProgress,
   }) {
     return analyzeFileImpl(
       audioFilePath,
       modules: modules,
       analysisContext: analysisContext,
+      prepareAudioFormat: prepareAudioFormat,
+      onPrepareProgress: onPrepareProgress,
     );
   }
 
@@ -115,17 +123,25 @@ class SpeechKit {
   ///
   /// This passes a **single buffer** as one `AnalyzerInput`. For multiple
   /// chunks over time, use [analyzePcmStream].
+  ///
+  /// [prepareAudioFormat] / [onPrepareProgress] follow the same rules as
+  /// [analyzeFile] (`prepareToAnalyze`). If [prepareAudioFormat] is null,
+  /// [format] is used for preparation.
   SpeechAnalysisSession analyzePcm(
     Uint8List pcmBytes, {
     required CompatibleAudioFormat format,
     required List<SpeechModuleConfiguration> modules,
     AnalysisContext? analysisContext,
+    CompatibleAudioFormat? prepareAudioFormat,
+    void Function(double fractionCompleted)? onPrepareProgress,
   }) {
     return analyzePcmImpl(
       pcmBytes,
       format: format,
       modules: modules,
       analysisContext: analysisContext,
+      prepareAudioFormat: prepareAudioFormat,
+      onPrepareProgress: onPrepareProgress,
     );
   }
 
@@ -138,17 +154,24 @@ class SpeechKit {
   ///
   /// When the stream completes without error, native input is finished and the
   /// analyzer can finalize. Errors during iteration cancel the session.
+  ///
+  /// [prepareAudioFormat] / [onPrepareProgress] follow the same rules as
+  /// [analyzePcm]. PCM payloads still use [format] for buffer layout.
   SpeechAnalysisSession analyzePcmStream(
     Stream<Uint8List> pcmChunks, {
     required CompatibleAudioFormat format,
     required List<SpeechModuleConfiguration> modules,
     AnalysisContext? analysisContext,
+    CompatibleAudioFormat? prepareAudioFormat,
+    void Function(double fractionCompleted)? onPrepareProgress,
   }) {
     return analyzePcmStreamImpl(
       pcmChunks,
       format: format,
       modules: modules,
       analysisContext: analysisContext,
+      prepareAudioFormat: prepareAudioFormat,
+      onPrepareProgress: onPrepareProgress,
     );
   }
 

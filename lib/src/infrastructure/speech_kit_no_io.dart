@@ -52,6 +52,8 @@ SpeechAnalysisSession analyzeFileImpl(
   String audioFilePath, {
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  CompatibleAudioFormat? prepareAudioFormat,
+  void Function(double fractionCompleted)? onPrepareProgress,
 }) {
   throw _noIo();
 }
@@ -61,6 +63,8 @@ SpeechAnalysisSession analyzePcmImpl(
   required CompatibleAudioFormat format,
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  CompatibleAudioFormat? prepareAudioFormat,
+  void Function(double fractionCompleted)? onPrepareProgress,
 }) {
   throw _noIo();
 }
@@ -70,6 +74,8 @@ SpeechAnalysisSession analyzePcmStreamImpl(
   required CompatibleAudioFormat format,
   required List<SpeechModuleConfiguration> modules,
   AnalysisContext? analysisContext,
+  CompatibleAudioFormat? prepareAudioFormat,
+  void Function(double fractionCompleted)? onPrepareProgress,
 }) {
   throw _noIo();
 }

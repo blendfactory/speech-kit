@@ -222,6 +222,49 @@ private func avAudioPCMBuffer(pcmData: Data, format: AVAudioFormat) throws -> AV
   return buffer
 }
 
+/// Maps to `SpeechAnalyzer.prepareToAnalyze(in:withProgressReadyHandler:)` progress events.
+@available(macOS 26.0, *)
+private func sendPrepareProgressCallback(
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+  fraction: Double,
+) {
+  let clamped = min(1.0, max(0.0, fraction))
+  let payload: [String: Any] = ["fractionCompleted": clamped]
+  guard let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+        let jsonStr = String(data: data, encoding: .utf8)
+  else {
+    return
+  }
+  callback(2, 0, dupCString(jsonStr))
+}
+
+/// Calls `prepareToAnalyze` with optional `Progress` observation (event type `2` to Dart).
+@available(macOS 26.0, *)
+private func prepareToAnalyzeForAnalyzer(
+  analyzer: SpeechAnalyzer,
+  format: AVAudioFormat,
+  reportProgress: Bool,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) async throws {
+  var progressObservation: NSKeyValueObservation?
+  defer {
+    progressObservation?.invalidate()
+  }
+  try await analyzer.prepareToAnalyze(
+    in: format,
+    withProgressReadyHandler: reportProgress
+      ? { progress in
+        progressObservation = progress.observe(\.fractionCompleted, options: [.initial, .new]) { p, _ in
+          let frac = p.fractionCompleted
+          if frac.isFinite, !frac.isNaN {
+            sendPrepareProgressCallback(callback: callback, fraction: frac)
+          }
+        }
+      }
+      : nil,
+  )
+}
+
 @available(macOS 26.0, *)
 private func encodeStatus(_ status: AssetInventory.Status) -> Int32 {
   switch status {
@@ -521,6 +564,8 @@ private func runAnalyzerFileSession(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   audioFilePathUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  prepareFormatJson: String?,
+  reportPrepareProgress: Bool,
   sessionId: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) async {
@@ -573,9 +618,18 @@ private func runAnalyzerFileSession(
     let audioURL = URL(fileURLWithPath: audioPath)
     let audioFile = try AVAudioFile(forReading: audioURL)
 
-    try await analyzer!.prepareToAnalyze(
-      in: audioFile.processingFormat,
-      withProgressReadyHandler: nil,
+    let effectivePrepareFormat: AVAudioFormat
+    if let prepareFormatJson, !prepareFormatJson.isEmpty {
+      effectivePrepareFormat = try avAudioFormatFromCompatibleJsonString(prepareFormatJson)
+    } else {
+      effectivePrepareFormat = audioFile.processingFormat
+    }
+
+    try await prepareToAnalyzeForAnalyzer(
+      analyzer: analyzer!,
+      format: effectivePrepareFormat,
+      reportProgress: reportPrepareProgress,
+      callback: callback,
     )
 
     // Start draining results first so we don't miss early phrases.
@@ -628,6 +682,8 @@ private func runAnalyzerPcmSession(
   formatJsonUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
   pcmData: Data,
+  prepareFormatJson: String?,
+  reportPrepareProgress: Bool,
   sessionId: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) async {
@@ -675,14 +731,23 @@ private func runAnalyzerPcmSession(
 
     let avFormat = try avAudioFormatFromCompatibleJsonString(formatStr)
 
+    let effectivePrepareFormat: AVAudioFormat
+    if let prepareFormatJson, !prepareFormatJson.isEmpty {
+      effectivePrepareFormat = try avAudioFormatFromCompatibleJsonString(prepareFormatJson)
+    } else {
+      effectivePrepareFormat = avFormat
+    }
+
     analyzer = SpeechAnalyzer(modules: modules)
     if let ctx = try analysisContextFromJsonUtf8(analysisContextJsonUtf8) {
       try await analyzer!.setContext(ctx)
     }
 
-    try await analyzer!.prepareToAnalyze(
-      in: avFormat,
-      withProgressReadyHandler: nil,
+    try await prepareToAnalyzeForAnalyzer(
+      analyzer: analyzer!,
+      format: effectivePrepareFormat,
+      reportProgress: reportPrepareProgress,
+      callback: callback,
     )
 
     if let transcriber = speechTranscriber {
@@ -736,6 +801,8 @@ private func runAnalyzerPcmStreamSession(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   formatJsonUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  prepareFormatJson: String?,
+  reportPrepareProgress: Bool,
   sessionId: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) async {
@@ -784,14 +851,23 @@ private func runAnalyzerPcmStreamSession(
 
     let avFormat = try avAudioFormatFromCompatibleJsonString(formatStr)
 
+    let effectivePrepareFormat: AVAudioFormat
+    if let prepareFormatJson, !prepareFormatJson.isEmpty {
+      effectivePrepareFormat = try avAudioFormatFromCompatibleJsonString(prepareFormatJson)
+    } else {
+      effectivePrepareFormat = avFormat
+    }
+
     analyzer = SpeechAnalyzer(modules: modules)
     if let ctx = try analysisContextFromJsonUtf8(analysisContextJsonUtf8) {
       try await analyzer!.setContext(ctx)
     }
 
-    try await analyzer!.prepareToAnalyze(
-      in: avFormat,
-      withProgressReadyHandler: nil,
+    try await prepareToAnalyzeForAnalyzer(
+      analyzer: analyzer!,
+      format: effectivePrepareFormat,
+      reportProgress: reportPrepareProgress,
+      callback: callback,
     )
 
     let (inputStream, streamContinuation) = AsyncStream<AnalyzerInput>.makeStream(
@@ -845,12 +921,23 @@ public func sk_speech_analyzer_analyze_file_async(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   audioFilePathUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  prepareFormatJsonUtf8: UnsafePointer<CChar>?,
+  prepareProgressEnabled: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) -> Int32 {
   if #unavailable(macOS 26.0) {
     callback(-1, 4, dupCString("SpeechAnalyzer requires macOS 26"))
     return -1
   }
+
+  let prepareFormatStr: String?
+  if let prepareFormatJsonUtf8 {
+    let s = String(cString: prepareFormatJsonUtf8)
+    prepareFormatStr = s.isEmpty ? nil : s
+  } else {
+    prepareFormatStr = nil
+  }
+  let reportPrepareProgress = prepareProgressEnabled != 0
 
   _analyzerSessionsLock.lock()
   let sessionId = _nextAnalyzerSessionId
@@ -862,6 +949,8 @@ public func sk_speech_analyzer_analyze_file_async(
       modulesJsonUtf8: modulesJsonUtf8,
       audioFilePathUtf8: audioFilePathUtf8,
       analysisContextJsonUtf8: analysisContextJsonUtf8,
+      prepareFormatJson: prepareFormatStr,
+      reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
       callback: callback,
     )
@@ -881,6 +970,8 @@ public func sk_speech_analyzer_analyze_pcm_async(
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
   pcmBytes: UnsafePointer<UInt8>?,
   pcmByteLength: Int64,
+  prepareFormatJsonUtf8: UnsafePointer<CChar>?,
+  prepareProgressEnabled: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) -> Int32 {
   if #unavailable(macOS 26.0) {
@@ -895,6 +986,15 @@ public func sk_speech_analyzer_analyze_pcm_async(
     pcmData = Data()
   }
 
+  let prepareFormatStr: String?
+  if let prepareFormatJsonUtf8 {
+    let s = String(cString: prepareFormatJsonUtf8)
+    prepareFormatStr = s.isEmpty ? nil : s
+  } else {
+    prepareFormatStr = nil
+  }
+  let reportPrepareProgress = prepareProgressEnabled != 0
+
   _analyzerSessionsLock.lock()
   let sessionId = _nextAnalyzerSessionId
   _nextAnalyzerSessionId &+= 1
@@ -906,6 +1006,8 @@ public func sk_speech_analyzer_analyze_pcm_async(
       formatJsonUtf8: formatJsonUtf8,
       analysisContextJsonUtf8: analysisContextJsonUtf8,
       pcmData: pcmData,
+      prepareFormatJson: prepareFormatStr,
+      reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
       callback: callback,
     )
@@ -923,12 +1025,23 @@ public func sk_speech_analyzer_start_pcm_stream_async(
   modulesJsonUtf8: UnsafePointer<CChar>?,
   formatJsonUtf8: UnsafePointer<CChar>?,
   analysisContextJsonUtf8: UnsafePointer<CChar>?,
+  prepareFormatJsonUtf8: UnsafePointer<CChar>?,
+  prepareProgressEnabled: Int32,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) -> Int32 {
   if #unavailable(macOS 26.0) {
     callback(-1, 4, dupCString("SpeechAnalyzer requires macOS 26"))
     return -1
   }
+
+  let prepareFormatStr: String?
+  if let prepareFormatJsonUtf8 {
+    let s = String(cString: prepareFormatJsonUtf8)
+    prepareFormatStr = s.isEmpty ? nil : s
+  } else {
+    prepareFormatStr = nil
+  }
+  let reportPrepareProgress = prepareProgressEnabled != 0
 
   _analyzerSessionsLock.lock()
   let sessionId = _nextAnalyzerSessionId
@@ -940,6 +1053,8 @@ public func sk_speech_analyzer_start_pcm_stream_async(
       modulesJsonUtf8: modulesJsonUtf8,
       formatJsonUtf8: formatJsonUtf8,
       analysisContextJsonUtf8: analysisContextJsonUtf8,
+      prepareFormatJson: prepareFormatStr,
+      reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
       callback: callback,
     )
