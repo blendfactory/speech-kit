@@ -1,6 +1,10 @@
+/// @docImport 'package:speech_kit/src/domain/errors/speech_kit_exception.dart';
+library;
+
 import 'package:meta/meta.dart';
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
+import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/speech_recognition_permission.dart';
@@ -59,6 +63,17 @@ class SpeechKit {
   /// models. Only `SpeechTranscriberConfiguration` entries are supported.
   Future<void> ensureAssetsInstalled(List<SpeechModuleConfiguration> modules) {
     return ensureAssetsInstalledImpl(modules);
+  }
+
+  /// Best audio format for the given modules (`SpeechAnalyzer`
+  /// `bestAvailableAudioFormat(compatibleWith:)`).
+  ///
+  /// Returns `null` from Apple when assets are missing; this method throws
+  /// [SpeechKitException] with a descriptive message in that case.
+  Future<CompatibleAudioFormat> bestAvailableAudioFormat(
+    List<SpeechModuleConfiguration> modules,
+  ) {
+    return bestAvailableAudioFormatImpl(modules);
   }
 
   /// Starts a file-based `SpeechAnalyzer` session and streams transcription

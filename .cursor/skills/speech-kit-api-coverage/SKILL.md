@@ -54,7 +54,7 @@ Update rows as implementation progresses.
 | API / capability | Status | Notes |
 |------------------|--------|-------|
 | `SpeechAnalyzer` init with modules | ✅ | Swift uses `SpeechAnalyzer(modules:)` |
-| `SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:)` | ❌ | Not called in this first implementation (uses file-based `analyzeSequence(from:)`). |
+| `SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:)` | ✅ | Dart: `SpeechKit.bestAvailableAudioFormat` → `CompatibleAudioFormat` (JSON from Swift `AVAudioFormat`). |
 | `AnalyzerInput` / buffer or file input | 🚧 | File input supported via `SpeechAnalyzer.analyzeSequence(from:)`. Buffer input (`AnalyzerInput` + `AsyncSequence`) not yet. |
 | `analyzeSequence(_:)` or `start(inputSequence:)` | ✅ | File-based `analyzeSequence(from:)` supported. |
 | Result consumption (`SpeechTranscriber.results` / `AsyncSequence`) | ✅ | Swift drains `transcriber.results` and forwards each phrase to Dart `Stream<TranscriptionSegment>`. |

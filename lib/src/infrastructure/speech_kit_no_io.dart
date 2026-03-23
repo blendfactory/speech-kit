@@ -1,5 +1,6 @@
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
+import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/speech_recognition_permission.dart';
@@ -32,6 +33,12 @@ Future<AssetInventoryStatus> assetInventoryStatusImpl(
 }
 
 Future<void> ensureAssetsInstalledImpl(
+  List<SpeechModuleConfiguration> modules,
+) {
+  return Future.error(_noIo());
+}
+
+Future<CompatibleAudioFormat> bestAvailableAudioFormatImpl(
   List<SpeechModuleConfiguration> modules,
 ) {
   return Future.error(_noIo());

@@ -139,6 +139,64 @@ public func sk_asset_ensure_installed_async(
   }
 }
 
+// MARK: - SpeechAnalyzer.bestAvailableAudioFormat
+
+@available(macOS 26.0, *)
+private func runBestAvailableAudioFormat(
+  modulesJsonUtf8: UnsafePointer<CChar>?,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) async {
+  guard let modulesJsonUtf8 else {
+    callback(-1, 2, dupCString("null json pointer"))
+    return
+  }
+  let str = String(cString: modulesJsonUtf8)
+  guard let data = str.data(using: .utf8) else {
+    callback(-1, 2, dupCString("invalid utf-8"))
+    return
+  }
+  do {
+    let modules = try parseModules(data: data)
+    let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: modules)
+    guard let format else {
+      callback(
+        -1,
+        5,
+        dupCString(
+          "bestAvailableAudioFormat returned nil; install on-device assets first."
+        ),
+      )
+      return
+    }
+    let payload: [String: Any] = [
+      "sampleRate": format.sampleRate,
+      "channelCount": Int(format.channelCount),
+      "commonFormat": Int(format.commonFormat.rawValue),
+      "isInterleaved": format.isInterleaved,
+    ]
+    let jsonData = try JSONSerialization.data(withJSONObject: payload, options: [])
+    let jsonStr = String(data: jsonData, encoding: .utf8) ?? "{}"
+    callback(0, 0, dupCString(jsonStr))
+  } catch {
+    let ns = error as NSError
+    callback(-1, 1, dupCString(ns.localizedDescription))
+  }
+}
+
+@_cdecl("sk_speech_best_available_audio_format_async")
+public func sk_speech_best_available_audio_format_async(
+  modulesJsonUtf8: UnsafePointer<CChar>?,
+  callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
+) {
+  if #unavailable(macOS 26.0) {
+    callback(-1, 4, dupCString("SpeechAnalyzer requires macOS 26"))
+    return
+  }
+  Task {
+    await runBestAvailableAudioFormat(modulesJsonUtf8: modulesJsonUtf8, callback: callback)
+  }
+}
+
 // MARK: - SpeechAnalyzer (file-based) session streaming
 
 private let _analyzerSessionsLock = NSLock()

@@ -7,6 +7,7 @@ import 'package:ffi/ffi.dart';
 import 'package:speech_kit/src/application/speech_analysis_session.dart';
 import 'package:speech_kit/src/domain/errors/speech_kit_exception.dart';
 import 'package:speech_kit/src/domain/value_objects/assets/asset_inventory_status.dart';
+import 'package:speech_kit/src/domain/value_objects/audio/compatible_audio_format.dart';
 import 'package:speech_kit/src/domain/value_objects/configuration/speech_module_configuration.dart';
 import 'package:speech_kit/src/domain/value_objects/identifiers/speech_analysis_session_id.dart';
 import 'package:speech_kit/src/domain/value_objects/permissions/microphone_permission.dart';
@@ -87,6 +88,20 @@ external void _skAssetInventoryStatusAsync(
   assetId: 'package:speech_kit/speech_kit.dart',
 )
 external void _skAssetEnsureInstalledAsync(
+  Pointer<Utf8> jsonUtf8,
+  Pointer<NativeFunction<SkAssetCallbackNative>> callback,
+);
+
+@Native<
+  Void Function(
+    Pointer<Utf8>,
+    Pointer<NativeFunction<SkAssetCallbackNative>>,
+  )
+>(
+  symbol: 'sk_speech_best_available_audio_format_async',
+  assetId: 'package:speech_kit/speech_kit.dart',
+)
+external void _skSpeechBestAvailableAudioFormatAsync(
   Pointer<Utf8> jsonUtf8,
   Pointer<NativeFunction<SkAssetCallbackNative>> callback,
 );
@@ -381,6 +396,60 @@ Future<void> ensureAssetsInstalledImpl(
     }
   });
   _skAssetEnsureInstalledAsync(jsonPtr, callback.nativeFunction);
+  return completer.future;
+}
+
+Future<CompatibleAudioFormat> bestAvailableAudioFormatImpl(
+  List<SpeechModuleConfiguration> modules,
+) {
+  _ensureAppleDesktop();
+  if (modules.isEmpty) {
+    return Future.error(
+      const SpeechKitException(
+        'At least one SpeechModuleConfiguration is required.',
+        failure: SpeechKitFailure.operationFailed,
+      ),
+    );
+  }
+  final json = _encodeSpeechModulesJson(modules);
+  final jsonPtr = json.toNativeUtf8();
+  final completer = Completer<CompatibleAudioFormat>();
+  late final NativeCallable<Void Function(Int32, Int32, Pointer<Utf8>)>
+  callback;
+  callback = NativeCallable.listener((int _, int err, Pointer<Utf8> msg) {
+    try {
+      if (err != 0) {
+        final text = _mallocUtf8ToDartAndFree(msg);
+        completer.completeError(
+          SpeechKitException(
+            text ?? 'bestAvailableAudioFormat failed (error code $err)',
+            failure: SpeechKitFailure.operationFailed,
+          ),
+        );
+        return;
+      }
+      final text = _mallocUtf8ToDartAndFree(msg);
+      if (text == null) {
+        completer.completeError(
+          const SpeechKitException(
+            'bestAvailableAudioFormat returned empty payload.',
+            failure: SpeechKitFailure.operationFailed,
+          ),
+        );
+        return;
+      }
+      final payload = jsonDecode(text) as Map<String, dynamic>;
+      completer.complete(CompatibleAudioFormat.fromJson(payload));
+    } on Object catch (e, st) {
+      if (!completer.isCompleted) {
+        completer.completeError(e, st);
+      }
+    } finally {
+      malloc.free(jsonPtr);
+      callback.close();
+    }
+  });
+  _skSpeechBestAvailableAudioFormatAsync(jsonPtr, callback.nativeFunction);
   return completer.future;
 }
 

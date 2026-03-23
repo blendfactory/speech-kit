@@ -22,6 +22,16 @@ void main() {
           ),
         ),
       );
+      await expectLater(
+        kit.bestAvailableAudioFormat(const []),
+        throwsA(
+          predicate(
+            (e) =>
+                e is SpeechKitException &&
+                e.failure == SpeechKitFailure.operationFailed,
+          ),
+        ),
+      );
       final status = await kit.assetInventoryStatus([
         const SpeechTranscriberConfiguration(
           localeId: 'en-US',
