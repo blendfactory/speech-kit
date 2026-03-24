@@ -11,13 +11,11 @@ environment:
   sdk: ^3.10.0
 
 platforms:
-  ios:
   macos:
 
 topics:
   - speech
   - speech-recognition
-  - ios
   - macos
   - ffi
 
