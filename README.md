@@ -27,7 +27,7 @@ Native Dart bindings for Apple Speech (SpeechAnalyzer pipeline) using Dart Build
 | iOS | ❌ |
 | Android | ❌ |
 
-**macOS** is the supported target for the native dylib in this release (`pubspec.yaml` also lists iOS for future packaging). The module APIs used here require **recent Apple OS releases** (e.g. **macOS 26+** for the current Swift bridge, consistent with **iOS 26+ / visionOS 26+** for the same Speech symbols). Callers need **`dart:io`** (VM or an embedder that provides `dart.library.io`); non-IO configurations use stubs that throw `UnsupportedError`.
+**macOS** is the supported target for the native dylib in this release (`platforms` in `pubspec.yaml` is macOS-only). The module APIs used here require **recent Apple OS releases** (e.g. **macOS 26+** for the current Swift bridge, consistent with **iOS 26+ / visionOS 26+** for the same Speech symbols). Callers need **`dart:io`** (VM or an embedder that provides `dart.library.io`); non-IO configurations use stubs that throw `UnsupportedError`.
 
 ## Installation
 
