@@ -4,11 +4,9 @@ Thank you for helping improve `speech_kit` and this repository.
 
 ## Development setup
 
-As the package layout is established, the following will apply:
-
-- **Dart SDK** — version constraint will be declared in `pubspec.yaml`.
-- **Apple platforms** — Xcode and devices or simulators for iOS/macOS when working on the native bridge or integration tests.
-- **Permissions** — Speech recognition and microphone usage require appropriate entitlements and Info.plist / usage descriptions; examples will live under `example/` when added.
+- **Dart SDK** — see the `environment.sdk` constraint in [`pubspec.yaml`](pubspec.yaml).
+- **Host OS** — the native FFI implementation in this release targets **macOS** (`dart:io` + `Platform.isMacOS`). Use a **Mac with Xcode** when building or debugging the Swift bridge under [`native/`](native/).
+- **Permissions** — speech recognition and microphone flows need appropriate **Info.plist** usage strings (`NSSpeechRecognitionUsageDescription`, `NSMicrophoneUsageDescription`) in the **host app** bundle. CLI `dart run` is limited; see [`example/README.md`](example/README.md) for bundle notes and the helper script.
 
 From the package root:
 
@@ -18,7 +16,15 @@ dart analyze
 dart test
 ```
 
-To run the example CLI:
+Optional formatting:
+
+```bash
+dart format .
+```
+
+### Example CLI
+
+Samples live under [`example/`](example/). From the package root:
 
 ```bash
 cd example
@@ -26,10 +32,12 @@ dart pub get
 dart run bin/permission_status.dart
 ```
 
+Other entry points include `bin/asset_inventory.dart` and `bin/analyze_file.dart` (see [`example/README.md`](example/README.md)).
+
 ## Pull requests
 
 - Keep changes focused; prefer small PRs for reviewability.
-- Run `dart format .`, `dart analyze`, and `dart test` before submitting when those commands are available.
+- Run `dart format .`, `dart analyze`, and `dart test` before submitting.
 - Follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages (see `.cursor/rules/commit-message-standards.mdc` in this repo).
 - Document public API changes in `CHANGELOG.md` under `[Unreleased]` when behavior or surface changes.
 

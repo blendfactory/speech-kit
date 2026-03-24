@@ -1,12 +1,12 @@
 # Domain Model: Speech Analysis (SpeechAnalyzer pipeline)
 
-This document defines the **bounded context**, proposed **aggregate**, **entities** (if any), and **value objects** for on-device speech analysis using Apple’s **`SpeechAnalyzer` + `SpeechTranscriber` + `AssetInventory`** API. **Scalar handles** should use **Dart extension types** where appropriate; **multi-field** concepts use **immutable classes**.
+This document describes the **bounded context**, **aggregate root**, **entities** (if any), and **value objects** for on-device speech analysis using Apple’s **`SpeechAnalyzer` + `SpeechTranscriber` + `AssetInventory`** APIs. **Scalar handles** use **Dart extension types** where appropriate; **multi-field** concepts use **immutable classes**.
 
 ## Bounded context
 
 **Speech analysis (module pipeline)**: Configuring and running a **single** `SpeechAnalyzer` session (one input sequence at a time per Apple’s model), ensuring **locale assets** are available, feeding **time-coded audio** (`AnalyzerInput`), and consuming **module results** (e.g. transcription text and time ranges). Boundaries:
 
-- **In scope**: Transcription-oriented modules (`SpeechTranscriber`, `DictationTranscriber` if exposed), optional non-transcription modules (`SpeechDetector`, etc.), **asset inventory** status/install, **session lifecycle** (analyze, finalize, cancel).
+- **In scope**: Transcription-oriented modules (`SpeechTranscriber`, `DictationTranscriber`), optional `SpeechDetector`, **asset inventory** status/install, **session lifecycle** (analyze, finalize, cancel).
 - **Out of scope**: Legacy **`SFSpeechRecognizer`** / task API; **translation**, **summarization**, **LLM post-processing**, and **arbitrary audio encoding**—callers handle those outside this package.
 - **Apple types**: Domain names are **Dart** names; map to `SpeechAnalyzer`, `SpeechTranscriber`, `AssetInventory`, `AnalyzerInput` in infrastructure only.
 
@@ -14,39 +14,44 @@ This document defines the **bounded context**, proposed **aggregate**, **entitie
 
 ## Aggregate: SpeechAnalysisSession (aggregate root)
 
-**Aggregate root**: `SpeechAnalysisSession` (conceptual target; implement when the native bridge lands).
+**Aggregate root**: [`SpeechAnalysisSession`](../lib/src/application/speech_analysis_session.dart) — one logical analysis session per native `SpeechAnalyzer` run.
 
-**Consistency boundary**: One logical **analysis session** matches one native analyzer configuration for a **single input sequence** (aligned with Apple: the analyzer consumes one stream at a time). The root holds:
+**Consistency boundary**: One session matches one native analyzer configuration for a **single input sequence**. The application-layer type exposes:
 
-- Immutable **module configuration** for that session (e.g. transcriber locale and preset/options snapshot).
-- Opaque **session handle** (maps to native `SpeechAnalyzer` / coordinator)—see `SpeechAnalysisSessionId`.
+- Opaque **`SpeechAnalysisSessionId`** (native handle for finalize/cancel routing).
+- **`Stream<TranscriptionSegment>`** for progressive results (immutable chunks; not stored inside a mutable aggregate graph).
+- **`finalizeAndFinish`** / **`cancelAndFinishNow`** mapped to Apple’s `finalizeAndFinish` / `cancelAndFinishNow`.
 
-**Invariants** (target):
+Module lists (`List<SpeechModuleConfiguration>`) and optional `AnalysisContext` / `SpeechAnalyzerOptions` are supplied when **`SpeechKit`** starts analysis; they are not duplicated on `SpeechAnalysisSession` itself.
 
-- Session is created only after **asset readiness** is satisfied for the configured modules (or the app explicitly opts into a flow that installs/downloads assets first).
-- **Finalize or cancel** is explicit: callers must end sessions per Apple semantics (`finalizeAndFinish`, `cancelAndFinishNow`, etc.); document pairing with Dart subscription cancellation.
-- **No legacy pipeline**: Domain and application layers must not model `SFSpeechRecognitionTask` or recognizer-centric flows.
+**Invariants**:
 
-**Lifecycle**: `prepared` → `analyzing` → `finalized` | `cancelled` | `failed`. Immutable snapshots where useful; native ownership stays in infrastructure.
+- Callers should ensure **assets** are ready (or use `ensureAssetsInstalled`) before analysis; the session type does not re-check inventory.
+- **Finalize or cancel** is explicit for lifecycle control; cancel subscription as needed to match native teardown.
+- **No legacy pipeline**: Domain and application layers do not model `SFSpeechRecognitionTask` or recognizer-centric flows.
+
+**Lifecycle**: Native-driven; Dart exposes terminal operations on `SpeechAnalysisSession` rather than mirroring every internal state name.
 
 ```mermaid
 flowchart TB
   subgraph Aggregate["Aggregate: SpeechAnalysisSession"]
     AR["SpeechAnalysisSession\n(aggregate root)"]
     AR --> VO_SID["SpeechAnalysisSessionId\n(extension type)"]
-    AR --> VO_CFG["TranscriberConfiguration\n(immutable class, example)"]
+    AR --> STR["Stream of TranscriptionSegment"]
   end
-  subgraph Streamed["Streamed outputs (value objects, outside aggregate state)"]
-    VO_RES["TranscriptionUpdate / SegmentResult\n(immutable classes)"]
+  subgraph Config["Supplied at session start (not fields on the session)"]
+    MOD["List of SpeechModuleConfiguration"]
+    CTX["AnalysisContext, SpeechAnalyzerOptions (optional)"]
   end
-  AR -.->|emits| VO_RES
+  MOD -.->|passed to SpeechKit| AR
+  CTX -.->|passed to SpeechKit| AR
 ```
 
 ---
 
 ## Entities
 
-Prefer **value objects** and the **session aggregate** first. Add **entities** only when something has **identity** across time beyond the session (e.g. a durable “reserved locale slot” if modeled explicitly). Initially **no extra entities** are required; **`SpeechAnalysisSession`** is the single root.
+Prefer **value objects** and the **session aggregate** first. Add **entities** only when something has **identity** across time beyond the session. Currently **no extra entities** are required; **`SpeechAnalysisSession`** is the single root.
 
 ---
 
@@ -56,26 +61,24 @@ Prefer **value objects** and the **session aggregate** first. Add **entities** o
 
 | Value object | Representation | Purpose |
 |--------------|----------------|---------|
-| **SpeechAnalysisSessionId** | `int` (or `String` if native uses UUID) | Opaque id for one session; factory validates non-empty / positive per chosen mapping. |
-
-Adjust the representation once the FFI/Swift boundary defines the handle shape.
+| **SpeechAnalysisSessionId** | `extension type SpeechAnalysisSessionId(int)` | Opaque id for one session; `isValid` requires `value > 0`. |
 
 ### Configuration and status (immutable classes or enums)
 
 | Value object | Purpose |
 |--------------|---------|
-| **TranscriberConfiguration** | Snapshot of locale + preset/options needed to construct `SpeechTranscriber` (and siblings) on the native side. |
+| **SpeechModuleConfiguration** | Locale + module kind (transcriber, dictation, speech detector) and presets/options for native module construction. |
 | **AssetInventoryStatus** | Model-install state relevant to callers (mirrors `AssetInventory.Status` conceptually). |
-| **AnalysisSessionState** | Sealed type or enum for prepared / analyzing / finalized / cancelled / failed. |
+| **AnalysisContext** | Optional contextual strings for biasing recognition. |
+| **SpeechAnalyzerOptions** | Optional `SpeechAnalyzer.Options` mapping (task priority, model retention). |
 
 ### Result chunks (immutable classes)
 
-Module results are **streamed**; model them as **immutable value objects** passed to Dart `Stream` consumers (not stored inside the aggregate).
+Module results are **streamed** as **immutable value objects** for Dart `Stream` consumers.
 
 | Value object | Purpose |
 |--------------|---------|
-| **TranscriptionUpdate** | Progressive or final text plus timing metadata (e.g. range in audio timeline, confidence if exposed). Map from `SpeechTranscriber.Result` in infrastructure. |
-| **VolatileRangeHint** | If surfacing analyzer “volatile range” callbacks, use a small immutable type (start/end time). |
+| **TranscriptionSegment** | Text plus timing metadata from `SpeechTranscriber` results in infrastructure. |
 
 Use Dart `Duration` or dedicated time-range types with validation (finite, non-negative length) as appropriate.
 
@@ -83,7 +86,7 @@ Use Dart `Duration` or dedicated time-range types with validation (finite, non-n
 
 ## Domain errors
 
-- **`SpeechKitException`** (or similarly named) lives in **domain/errors/**: user-meaningful failures (permission denied, unsupported OS, unsupported locale, asset install failure, analyzer errors). Infrastructure maps native errors into this type.
+- **`SpeechKitException`** in **domain/errors/**: user-meaningful failures (permission denied, unsupported OS, unsupported locale, asset install failure, analyzer errors). Infrastructure maps native errors into this type.
 
 ---
 
@@ -97,12 +100,12 @@ Use Dart `Duration` or dedicated time-range types with validation (finite, non-n
 
 ---
 
-## File placement (target layout under `lib/src/domain/`)
+## File placement (`lib/src/domain/`)
 
 - `domain/entities/` — add only when a real entity with identity is needed (optional).
 - `domain/value_objects/identifiers/` — e.g. `speech_analysis_session_id.dart`.
-- `domain/value_objects/configuration/` — transcriber/module configuration snapshots.
-- `domain/value_objects/results/` — transcription updates, timing metadata.
+- `domain/value_objects/configuration/` — module configuration, analyzer options, custom language model export, etc.
+- `domain/value_objects/results/` — e.g. `transcription_segment.dart`.
 - `domain/errors/speech_kit_exception.dart`.
 
-Update this document when the first native bridge types are fixed.
+**Maintenance**: When adding a new public value object or changing the session contract, update this document and [`.cursor/skills/speech-kit-api-coverage/SKILL.md`](../.cursor/skills/speech-kit-api-coverage/SKILL.md) if Apple API coverage is affected.
