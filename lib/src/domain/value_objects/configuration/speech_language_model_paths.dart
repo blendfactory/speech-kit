@@ -1,6 +1,7 @@
+/// @docImport 'package:speech_kit/src/application/speech_kit.dart';
+library;
+
 import 'package:meta/meta.dart';
-import 'package:speech_kit/speech_kit.dart' show SpeechKit;
-import 'package:speech_kit/src/application/speech_kit.dart' show SpeechKit;
 
 /// Paths to **compiled** custom language model assets for dictation.
 ///
