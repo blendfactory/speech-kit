@@ -9,6 +9,8 @@ Future<int> runAnalyzeFileSample({
   required String audioFilePath,
   required String localeId,
   required bool installAssetsIfNeeded,
+  SpeechAnalyzerOptions? analyzerOptions,
+  AnalysisContext? analysisContext,
 }) async {
   if (!Platform.isMacOS) {
     stderr.writeln(
@@ -43,10 +45,8 @@ Future<int> runAnalyzeFileSample({
     final session = kit.analyzeFile(
       absolutePath,
       modules: modules,
-      // Optional bias vocabulary:
-      // analysisContext: const AnalysisContext(
-      //   contextualStringsByTag: {'general': ['AcmeCorp']},
-      // ),
+      analysisContext: analysisContext,
+      analyzerOptions: analyzerOptions,
     );
 
     await for (final segment in session.results) {
