@@ -90,7 +90,8 @@ This keeps the Dart surface small while delegating OS work to the native library
 
 ## Example app
 
-See the `example/` directory for command-line samples and macOS bundle notes. Run instructions: [example/README.md](example/README.md).
+See the `example/` directory for command-line samples and macOS bundle notes.
+Full instructions: [example/README.md](example/README.md).
 
 ## Roadmap
 
