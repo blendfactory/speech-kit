@@ -32,7 +32,8 @@ dart pub get
 dart run bin/permission_status.dart
 ```
 
-Other entry points include `bin/asset_inventory.dart` and `bin/analyze_file.dart` (see [`example/README.md`](example/README.md)).
+See [`example/README.md`](example/README.md) for CLI entry points (`permission_status`,
+`asset_inventory`, `analyze_file`, `best_audio_format`, etc.).
 
 ## Pull requests
 
