@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.0.1] - 2026-03-24
+## [0.0.1] - 2026-03-26
 
 First pub.dev release: native Dart bindings for Apple Speech (SpeechAnalyzer pipeline) on **macOS** via Dart Build Hooks and FFI.
 
