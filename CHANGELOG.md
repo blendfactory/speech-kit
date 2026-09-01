@@ -9,13 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Async FFI entry points (`analyzeFile`, `assetInventoryStatus`,
-  `ensureAssetsInstalled`) copied nothing before hopping onto a Swift `Task`,
-  so the Dart-owned input buffers were read after Dart freed them. This made
+- `analyzeFile` copied nothing before hopping onto a Swift `Task`, so the
+  Dart-owned input buffers were read after Dart freed them. This made
   `analyzeFile` fail with `NSCocoaErrorDomain 3840` ("The data couldn't be
   read...") in Flutter apps ([#1]).
-
-[#1]: https://github.com/blendfactory/speech-kit/issues/1
+- `assetInventoryStatus` and `ensureAssetsInstalled` now copy their JSON
+  input the same way, so the native side no longer depends on when Dart
+  frees the buffers. Dart already keeps those allocations until the
+  callback; this is defensive hardening, not the Flutter `analyzeFile`
+  failure.
 
 ## [0.0.1] - 2026-03-26
 
@@ -36,3 +38,4 @@ First pub.dev release: native Dart bindings for Apple Speech (SpeechAnalyzer pip
 
 [Unreleased]: https://github.com/blendfactory/speech-kit/compare/v0.0.1...HEAD
 [0.0.1]: https://github.com/blendfactory/speech-kit/releases/tag/v0.0.1
+[#1]: https://github.com/blendfactory/speech-kit/issues/1
