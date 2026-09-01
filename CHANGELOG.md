@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Async FFI entry points (`analyzeFile`, `assetInventoryStatus`,
+  `ensureAssetsInstalled`) copied nothing before hopping onto a Swift `Task`,
+  so the Dart-owned input buffers were read after Dart freed them. This made
+  `analyzeFile` fail with `NSCocoaErrorDomain 3840` ("The data couldn't be
+  read...") in Flutter apps ([#1]).
+
+[#1]: https://github.com/blendfactory/speech-kit/issues/1
+
 ## [0.0.1] - 2026-03-26
 
 First pub.dev release: native Dart bindings for Apple Speech (SpeechAnalyzer pipeline) on **macOS** via Dart Build Hooks and FFI.
