@@ -638,8 +638,15 @@ public func sk_asset_inventory_status_async(
     callback(-1, 4, dupCString("AssetInventory requires macOS 26"))
     return
   }
+  // Same lifetime rule as sk_speech_analyzer_analyze_file_async: copy the
+  // Dart-owned buffer before the Task runs, free it afterwards.
+  let jsonCopy = jsonUtf8.flatMap { strdup($0) }
   Task {
-    await runAssetInventoryStatus(jsonUtf8: jsonUtf8, callback: callback)
+    defer { free(jsonCopy) }
+    await runAssetInventoryStatus(
+      jsonUtf8: jsonCopy.map { UnsafePointer($0) },
+      callback: callback,
+    )
   }
 }
 
@@ -652,8 +659,15 @@ public func sk_asset_ensure_installed_async(
     callback(-1, 4, dupCString("AssetInventory requires macOS 26"))
     return
   }
+  // Same lifetime rule as sk_speech_analyzer_analyze_file_async: copy the
+  // Dart-owned buffer before the Task runs, free it afterwards.
+  let jsonCopy = jsonUtf8.flatMap { strdup($0) }
   Task {
-    await runAssetEnsureInstalled(jsonUtf8: jsonUtf8, callback: callback)
+    defer { free(jsonCopy) }
+    await runAssetEnsureInstalled(
+      jsonUtf8: jsonCopy.map { UnsafePointer($0) },
+      callback: callback,
+    )
   }
 }
 
@@ -1264,12 +1278,28 @@ public func sk_speech_analyzer_analyze_file_async(
   _nextAnalyzerSessionId &+= 1
   _analyzerSessionsLock.unlock()
 
+  // The Dart caller frees its input buffers as soon as this synchronous FFI
+  // call returns. Capturing the raw pointers inside the Task reads freed
+  // memory by the time the task runs (empty/garbage JSON -> Cocoa 3840 in
+  // parseModules; reproduces reliably under Flutter's busy heap). Copy them
+  // synchronously here and free the copies when the task finishes.
+  let modulesCopy = modulesJsonUtf8.flatMap { strdup($0) }
+  let audioPathCopy = audioFilePathUtf8.flatMap { strdup($0) }
+  let contextCopy = analysisContextJsonUtf8.flatMap { strdup($0) }
+  let optionsCopy = analyzerOptionsJsonUtf8.flatMap { strdup($0) }
+
   let task = Task {
+    defer {
+      free(modulesCopy)
+      free(audioPathCopy)
+      free(contextCopy)
+      free(optionsCopy)
+    }
     await runAnalyzerFileSession(
-      modulesJsonUtf8: modulesJsonUtf8,
-      audioFilePathUtf8: audioFilePathUtf8,
-      analysisContextJsonUtf8: analysisContextJsonUtf8,
-      analyzerOptionsJsonUtf8: analyzerOptionsJsonUtf8,
+      modulesJsonUtf8: modulesCopy.map { UnsafePointer($0) },
+      audioFilePathUtf8: audioPathCopy.map { UnsafePointer($0) },
+      analysisContextJsonUtf8: contextCopy.map { UnsafePointer($0) },
+      analyzerOptionsJsonUtf8: optionsCopy.map { UnsafePointer($0) },
       prepareFormatJson: prepareFormatStr,
       reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
