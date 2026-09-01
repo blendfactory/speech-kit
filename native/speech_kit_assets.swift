@@ -1352,13 +1352,24 @@ public func sk_speech_analyzer_analyze_pcm_async(
   _nextAnalyzerSessionId &+= 1
   _analyzerSessionsLock.unlock()
 
+  let modulesCopy = modulesJsonUtf8.flatMap { strdup($0) }
+  let formatCopy = formatJsonUtf8.flatMap { strdup($0) }
+  let contextCopy = analysisContextJsonUtf8.flatMap { strdup($0) }
+  let optionsCopy = analyzerOptionsJsonUtf8.flatMap { strdup($0) }
+
   let task = Task {
+    defer {
+      free(modulesCopy)
+      free(formatCopy)
+      free(contextCopy)
+      free(optionsCopy)
+    }
     await runAnalyzerPcmSession(
-      modulesJsonUtf8: modulesJsonUtf8,
-      formatJsonUtf8: formatJsonUtf8,
-      analysisContextJsonUtf8: analysisContextJsonUtf8,
+      modulesJsonUtf8: modulesCopy.map { UnsafePointer($0) },
+      formatJsonUtf8: formatCopy.map { UnsafePointer($0) },
+      analysisContextJsonUtf8: contextCopy.map { UnsafePointer($0) },
       pcmData: pcmData,
-      analyzerOptionsJsonUtf8: analyzerOptionsJsonUtf8,
+      analyzerOptionsJsonUtf8: optionsCopy.map { UnsafePointer($0) },
       prepareFormatJson: prepareFormatStr,
       reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
@@ -1402,12 +1413,23 @@ public func sk_speech_analyzer_start_pcm_stream_async(
   _nextAnalyzerSessionId &+= 1
   _analyzerSessionsLock.unlock()
 
+  let modulesCopy = modulesJsonUtf8.flatMap { strdup($0) }
+  let formatCopy = formatJsonUtf8.flatMap { strdup($0) }
+  let contextCopy = analysisContextJsonUtf8.flatMap { strdup($0) }
+  let optionsCopy = analyzerOptionsJsonUtf8.flatMap { strdup($0) }
+
   let task = Task {
+    defer {
+      free(modulesCopy)
+      free(formatCopy)
+      free(contextCopy)
+      free(optionsCopy)
+    }
     await runAnalyzerPcmStreamSession(
-      modulesJsonUtf8: modulesJsonUtf8,
-      formatJsonUtf8: formatJsonUtf8,
-      analysisContextJsonUtf8: analysisContextJsonUtf8,
-      analyzerOptionsJsonUtf8: analyzerOptionsJsonUtf8,
+      modulesJsonUtf8: modulesCopy.map { UnsafePointer($0) },
+      formatJsonUtf8: formatCopy.map { UnsafePointer($0) },
+      analysisContextJsonUtf8: contextCopy.map { UnsafePointer($0) },
+      analyzerOptionsJsonUtf8: optionsCopy.map { UnsafePointer($0) },
       prepareFormatJson: prepareFormatStr,
       reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
