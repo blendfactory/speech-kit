@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   frees the buffers. Dart already keeps those allocations until the
   callback; this is defensive hardening, not the Flutter `analyzeFile`
   failure.
+- `analyzePcm` and `analyzePcmStream` now copy their JSON pointer inputs
+  before the Swift `Task` the same way. `pcmBytes` was already copied
+  synchronously.
 
 ## [0.0.1] - 2026-03-26
 
