@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-11-02
+
 ### Fixed
 
 - `analyzePcmStream` returned no results when PCM chunks were pushed right
@@ -52,7 +54,8 @@ First pub.dev release: native Dart bindings for Apple Speech (SpeechAnalyzer pip
 - **Documentation** — README (structure aligned with `screen-capture-kit`), `CONTRIBUTING.md`, and `doc/domain-model.md` updated for the implemented API and macOS-only native path.
 - **`pubspec.yaml`** — `platforms` limited to **macOS** until iOS FFI is supported.
 
-[Unreleased]: https://github.com/blendfactory/speech-kit/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/blendfactory/speech-kit/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/blendfactory/speech-kit/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/blendfactory/speech-kit/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/blendfactory/speech-kit/releases/tag/v0.0.1
 [#1]: https://github.com/blendfactory/speech-kit/issues/1
