@@ -789,10 +789,42 @@ private final class PcmStreamBridge: @unchecked Sendable {
 }
 
 @available(macOS 26.0, *)
+// 調査用: 統合ログを読めない環境のためにファイルへ書く
+private func _skDebug(_ message: String) {
+  let line = "\(Date().timeIntervalSince1970) \(message)\n"
+  let url = URL(fileURLWithPath: "/tmp/speech_kit_debug.log")
+  if let handle = try? FileHandle(forWritingTo: url) {
+    handle.seekToEndOfFile()
+    handle.write(line.data(using: .utf8)!)
+    try? handle.close()
+  } else {
+    try? line.write(to: url, atomically: true, encoding: .utf8)
+  }
+}
+
+/// Creates the input stream for a PCM stream session and registers its bridge
+/// so that `sk_speech_analyzer_push_pcm_chunk` can accept chunks immediately.
+/// `AsyncStream` buffers the chunks until `analyzeSequence` starts reading.
+@available(macOS 26.0, *)
+private func _makeAndRegisterPcmStream(
+  sessionId: Int32,
+  format: AVAudioFormat,
+) -> AsyncStream<AnalyzerInput> {
+  let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream(
+    of: AnalyzerInput.self,
+  )
+  _registerPcmStream(
+    sessionId: sessionId,
+    bridge: PcmStreamBridge(format: format, continuation: continuation),
+  )
+  return stream
+}
+
 private func _registerPcmStream(sessionId: Int32, bridge: PcmStreamBridge) {
   _pcmStreamLock.lock()
   defer { _pcmStreamLock.unlock() }
   _pcmStreamBridges[sessionId] = bridge
+  _skDebug("pcm bridge registered session=\(sessionId)")
 }
 
 @available(macOS 26.0, *)
@@ -1132,6 +1164,7 @@ private func runAnalyzerPcmStreamSession(
   prepareFormatJson: String?,
   reportPrepareProgress: Bool,
   sessionId: Int32,
+  inputStream preparedInputStream: AsyncStream<AnalyzerInput>?,
   callback: @escaping @convention(c) (Int32, Int32, UnsafePointer<CChar>?) -> Void,
 ) async {
   guard let modulesJsonUtf8, let formatJsonUtf8 else {
@@ -1203,11 +1236,16 @@ private func runAnalyzerPcmStreamSession(
       callback: callback,
     )
 
-    let (inputStream, streamContinuation) = AsyncStream<AnalyzerInput>.makeStream(
-      of: AnalyzerInput.self,
-    )
-    let bridge = PcmStreamBridge(format: avFormat, continuation: streamContinuation)
-    _registerPcmStream(sessionId: sessionId, bridge: bridge)
+    // The input bridge is normally registered by
+    // `sk_speech_analyzer_start_pcm_stream_async` before the session id is
+    // returned, so chunks pushed during preparation are buffered. Fall back to
+    // registering it here only if that did not happen.
+    let inputStream: AsyncStream<AnalyzerInput>
+    if let preparedInputStream {
+      inputStream = preparedInputStream
+    } else {
+      inputStream = _makeAndRegisterPcmStream(sessionId: sessionId, format: avFormat)
+    }
 
     if let transcriber = speechTranscriber {
       resultsTask = Task<Void, Error> {
@@ -1418,6 +1456,17 @@ public func sk_speech_analyzer_start_pcm_stream_async(
   let contextCopy = analysisContextJsonUtf8.flatMap { strdup($0) }
   let optionsCopy = analyzerOptionsJsonUtf8.flatMap { strdup($0) }
 
+  // Dart starts pushing PCM as soon as it receives the session id, while the
+  // analyzer is still being prepared inside the Task below. Register the input
+  // bridge synchronously, before returning the id, so those early chunks are
+  // buffered instead of rejected (#5). If the format cannot be parsed here,
+  // the Task reports the same error through the callback as before.
+  let inputStream = formatJsonUtf8.flatMap { ptr in
+    (try? avAudioFormatFromCompatibleJsonString(String(cString: ptr))).map {
+      _makeAndRegisterPcmStream(sessionId: sessionId, format: $0)
+    }
+  }
+
   let task = Task {
     defer {
       free(modulesCopy)
@@ -1433,6 +1482,7 @@ public func sk_speech_analyzer_start_pcm_stream_async(
       prepareFormatJson: prepareFormatStr,
       reportPrepareProgress: reportPrepareProgress,
       sessionId: sessionId,
+      inputStream: inputStream,
       callback: callback,
     )
   }
@@ -1461,6 +1511,7 @@ public func sk_speech_analyzer_push_pcm_chunk(
   }
   let data = Data(bytes: pcmBytes, count: Int(pcmByteLength))
   guard let bridge = _pcmStreamBridge(for: sessionId) else {
+    _skDebug("push rejected: no bridge session=\(sessionId) bytes=\(pcmByteLength)")
     return -1
   }
   do {
