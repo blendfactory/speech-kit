@@ -879,7 +879,8 @@ SpeechAnalysisSession _speechAnalysisSessionFromNative(
   invokeNative, {
   void Function(double fractionCompleted)? onPrepareProgress,
   List<bool>? pcmStreamCancelFlag,
-  void Function(int sessionId)? onSessionStarted,
+  void Function(int sessionId, void Function(Object error) fail)?
+  onSessionStarted,
 }) {
   _ensureAppleDesktop();
   if (modules.isEmpty) {
@@ -996,8 +997,27 @@ SpeechAnalysisSession _speechAnalysisSessionFromNative(
     },
   );
 
+  /// Reports a failure detected on the Dart side (e.g. a PCM chunk the native
+  /// side rejected) through [controller], then stops the native session.
+  /// Without this, the session would just end and look like "no speech".
+  void failFromDart(Object error) {
+    if (!controller.isClosed) {
+      controller.addError(
+        error is SpeechKitException
+            ? error
+            : SpeechKitException(
+                error.toString(),
+                failure: SpeechKitFailure.operationFailed,
+              ),
+      );
+    }
+    if (nativeSessionId > 0) {
+      _skSpeechAnalyzerCancelAndFinishNow(nativeSessionId);
+    }
+  }
+
   nativeSessionId = invokeNative(callback.nativeFunction);
-  onSessionStarted?.call(nativeSessionId);
+  onSessionStarted?.call(nativeSessionId, failFromDart);
 
   return SpeechAnalysisSession(
     id: SpeechAnalysisSessionId(nativeSessionId),
@@ -1011,6 +1031,7 @@ Future<void> _pumpPcmStreamToNative(
   int sessionId,
   Stream<Uint8List> pcmChunks,
   List<bool> cancelFlag,
+  void Function(Object error) fail,
 ) async {
   try {
     await for (final chunk in pcmChunks) {
@@ -1043,9 +1064,10 @@ Future<void> _pumpPcmStreamToNative(
     if (!cancelFlag[0]) {
       _skSpeechAnalyzerFinishPcmInput(sessionId);
     }
-  } on Object {
+  } on Object catch (error) {
     if (!cancelFlag[0]) {
-      _skSpeechAnalyzerCancelAndFinishNow(sessionId);
+      // Surface the failure on `results` instead of ending silently.
+      fail(error);
     }
   }
 }
@@ -1247,9 +1269,14 @@ SpeechAnalysisSession analyzePcmStreamImpl(
     },
     onPrepareProgress: onPrepareProgress,
     pcmStreamCancelFlag: pcmStreamCancelFlag,
-    onSessionStarted: (sessionId) {
+    onSessionStarted: (sessionId, fail) {
       unawaited(
-        _pumpPcmStreamToNative(sessionId, pcmChunks, pcmStreamCancelFlag),
+        _pumpPcmStreamToNative(
+          sessionId,
+          pcmChunks,
+          pcmStreamCancelFlag,
+          fail,
+        ),
       );
     },
   );
