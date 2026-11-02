@@ -165,11 +165,12 @@ external void _skSpeechSupportedPhonemesAsync(
   Pointer<NativeFunction<SkAssetCallbackNative>> callback,
 );
 
-typedef SkSpeechAnalyzerEventCallbackNative = Void Function(
-  Int32 eventType,
-  Int32 errCode,
-  Pointer<Utf8> msg,
-);
+typedef SkSpeechAnalyzerEventCallbackNative =
+    Void Function(
+      Int32 eventType,
+      Int32 errCode,
+      Pointer<Utf8> msg,
+    );
 
 @Native<
   Int32 Function(

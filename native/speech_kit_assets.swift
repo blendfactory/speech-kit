@@ -788,20 +788,6 @@ private final class PcmStreamBridge: @unchecked Sendable {
   }
 }
 
-@available(macOS 26.0, *)
-// 調査用: 統合ログを読めない環境のためにファイルへ書く
-private func _skDebug(_ message: String) {
-  let line = "\(Date().timeIntervalSince1970) \(message)\n"
-  let url = URL(fileURLWithPath: "/tmp/speech_kit_debug.log")
-  if let handle = try? FileHandle(forWritingTo: url) {
-    handle.seekToEndOfFile()
-    handle.write(line.data(using: .utf8)!)
-    try? handle.close()
-  } else {
-    try? line.write(to: url, atomically: true, encoding: .utf8)
-  }
-}
-
 /// Creates the input stream for a PCM stream session and registers its bridge
 /// so that `sk_speech_analyzer_push_pcm_chunk` can accept chunks immediately.
 /// `AsyncStream` buffers the chunks until `analyzeSequence` starts reading.
@@ -820,11 +806,11 @@ private func _makeAndRegisterPcmStream(
   return stream
 }
 
+@available(macOS 26.0, *)
 private func _registerPcmStream(sessionId: Int32, bridge: PcmStreamBridge) {
   _pcmStreamLock.lock()
   defer { _pcmStreamLock.unlock() }
   _pcmStreamBridges[sessionId] = bridge
-  _skDebug("pcm bridge registered session=\(sessionId)")
 }
 
 @available(macOS 26.0, *)
@@ -1511,7 +1497,6 @@ public func sk_speech_analyzer_push_pcm_chunk(
   }
   let data = Data(bytes: pcmBytes, count: Int(pcmByteLength))
   guard let bridge = _pcmStreamBridge(for: sessionId) else {
-    _skDebug("push rejected: no bridge session=\(sessionId) bytes=\(pcmByteLength)")
     return -1
   }
   do {
