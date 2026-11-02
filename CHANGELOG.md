@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `analyzePcmStream` returned no results when PCM chunks were pushed right
+  after the session started. The native input bridge was registered only
+  after the analyzer finished preparing, so the first chunk was rejected and
+  the session ended without an error ([#5]). The bridge is now registered
+  before the session id is returned, and chunks pushed during preparation are
+  buffered.
+- When a PCM chunk cannot be pushed, `analyzePcmStream` now reports a
+  `SpeechKitException` on `results` instead of ending silently.
+
 ## [0.0.2] - 2026-09-02
 
 ### Fixed
@@ -45,3 +56,4 @@ First pub.dev release: native Dart bindings for Apple Speech (SpeechAnalyzer pip
 [0.0.2]: https://github.com/blendfactory/speech-kit/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/blendfactory/speech-kit/releases/tag/v0.0.1
 [#1]: https://github.com/blendfactory/speech-kit/issues/1
+[#5]: https://github.com/blendfactory/speech-kit/issues/5
